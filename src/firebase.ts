@@ -8,7 +8,7 @@ const app = initializeApp(firebaseConfig);
 // Improved initialization for environments with connectivity issues
 export const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,
-}, firebaseConfig.firestoreDatabaseId || '(default)');
+});
 export const auth = getAuth(app);
 
 // Connectivity Test with retry logic

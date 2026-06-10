@@ -1,0 +1,65 @@
+{
+  "name": "Krishi Bondhu - কৃষি বন্ধু",
+  "short_name": "কৃষি বন্ধু",
+  "description": "কৃষকের প্রকৃত বন্ধু - সম্পূর্ণ কৃষি সহায়তা অ্যাপ্লিকেশন",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FDFCFB",
+  "theme_color": "#2E7D32",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "bn",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["agriculture", "business", "productivity"],
+  "screenshots": [
+    {
+      "src": "/branding/app-store-shot.png",
+      "sizes": "1170x2532",
+      "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Farm Journal",
+      "short_name": "Journal",
+      "description": "খামার জার্নাল খুলুন",
+      "url": "/#/farm-journal",
+      "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Weather Alerts",
+      "short_name": "Weather",
+      "description": "আবহাওয়া সতর্কতা দেখুন",
+      "url": "/#/weather-alerts",
+      "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "AI Disease Detection",
+      "short_name": "AI Detect",
+      "description": "রোগ শনাক্তকরণ",
+      "url": "/#/ai-disease",
+      "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Marketplace",
+      "short_name": "Market",
+      "description": "বাজারে যান",
+      "url": "/#/farmer-market",
+      "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
+    }
+  ]
+}

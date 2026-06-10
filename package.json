@@ -9,7 +9,9 @@
     "start": "node dist/server.cjs",
     "lint": "tsc --noEmit",
     "create-admin": "tsx scripts/createAdminUser.ts",
-    "reset-admin": "tsx scripts/resetAdminUser.ts"
+    "reset-admin": "tsx scripts/resetAdminUser.ts",
+    "verify-build": "npm run build && npm run lint",
+    "verify-env": "node -e \"const envs = ['MONGODB_URI', 'JWT_SECRET', 'GEMINI_API_KEY']; envs.forEach(e => { const v = process.env[e]; if (!v || v.includes('your-')) console.error('❌ Missing or invalid: ' + e); else console.log('✅ ' + e); });\""
   },
   "dependencies": {
     "@google/genai": "^1.52.0",

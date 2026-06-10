@@ -10,6 +10,39 @@ import bcryptjs from "bcryptjs";
 
 dotenv.config();
 
+// Validate critical environment variables
+function validateEnvironment() {
+  const errors: string[] = [];
+  
+  // Server-only variables that must exist
+  const requiredVars = [
+    'MONGODB_URI',
+    'JWT_SECRET',
+    'GEMINI_API_KEY',
+  ];
+  
+  requiredVars.forEach(varName => {
+    if (!process.env[varName] || process.env[varName] === `your-${varName.toLowerCase()}-from-vercel`) {
+      errors.push(`Missing or invalid ${varName} environment variable`);
+    }
+  });
+
+  if (errors.length > 0) {
+    console.warn('⚠️  Environment Variable Warnings:');
+    errors.forEach(err => console.warn(`   - ${err}`));
+    
+    if (process.env.NODE_ENV === 'production') {
+      console.error('❌ CRITICAL: Missing required production environment variables');
+      console.error('   Set these in your Vercel dashboard: Settings → Environment Variables');
+      console.error('   Required variables: MONGODB_URI, JWT_SECRET, GEMINI_API_KEY');
+    }
+  } else {
+    console.log('✅ All required environment variables are configured');
+  }
+}
+
+validateEnvironment();
+
 const app = express();
 const PORT = 3000;
 
@@ -260,7 +293,20 @@ app.delete("/api/admin/users/:id", authMiddleware, adminMiddleware, async (req, 
 
 // API Routes
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", mode: process.env.NODE_ENV || 'development' });
+  const health = {
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    mode: process.env.NODE_ENV || 'development',
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    environment: {
+      hasMongodbUri: !!process.env.MONGODB_URI && process.env.MONGODB_URI !== 'your_mongodb_uri',
+      hasJwtSecret: !!process.env.JWT_SECRET && process.env.JWT_SECRET !== 'your_jwt_secret',
+      hasGeminiKey: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key',
+    }
+  };
+  res.json(health);
 });
 
 app.post("/api/ai/analyze", async (req, res) => {
@@ -390,11 +436,30 @@ async function start() {
   if (isProd) {
     console.log("[SERVER] Serving static files from dist...");
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    
+    // Serve static files with proper caching
+    app.use(express.static(distPath, {
+      maxAge: '1d',
+      etag: false,
+    }));
+    
+    // SPA Fallback - Only for HTML requests
     app.get("*", (req, res, next) => {
+      // Skip API routes
       if (req.url.startsWith('/api')) return next();
+      
+      // Skip file requests (has extension)
+      if (path.extname(req.url) && req.url !== '/') {
+        return next();
+      }
+      
       console.log(`[SERVER] Handling production SPA request: ${req.url}`);
-      res.sendFile(path.join(distPath, "index.html"));
+      res.sendFile(path.join(distPath, "index.html"), (err) => {
+        if (err) {
+          console.error("[SERVER] Failed to send index.html:", err);
+          res.status(500).end("Server error");
+        }
+      });
     });
     console.log("[SERVER] Production mode ready.");
   }
