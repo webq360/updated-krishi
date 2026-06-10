@@ -1,0 +1,1660 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { auth, db } from '../firebase';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { OperationType, handleFirestoreError } from '../firebase';
+import { motion, AnimatePresence } from 'motion/react';
+import { safeLocalStorage } from '../lib/storage';
+import { 
+  Plus, 
+  Edit2, 
+  Trash2, 
+  Save, 
+  X, 
+  Wheat, 
+  Bird, 
+  Fish, 
+  ShoppingBag, 
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  ChevronRight,
+  Users,
+  Activity,
+  Shield,
+  Phone,
+  MapPin,
+  Mail,
+  Loader2,
+  Database,
+  TrendingUp,
+  Calendar,
+  MessageSquare,
+  Landmark,
+  GraduationCap,
+  FileDown,
+  FileSpreadsheet,
+  Globe,
+  RefreshCw,
+  History as HistoryIcon,
+  CreditCard,
+  Send,
+  Info,
+  CheckCircle2,
+  Lock
+} from 'lucide-react';
+import { BANGLADESH_DISTRICTS } from '../constants/districts';
+import { cn } from '../lib/utils';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+
+import { UserItem, ListItem, Form } from './AdminSubcomponents';
+
+export default function AdminPanel() {
+  const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const [isAdmin, setIsAdmin] = useState(() => safeLocalStorage.getItem('isAdmin') === 'true');
+  const [isSuperAdmin, setIsSuperAdmin] = useState(() => safeLocalStorage.getItem('adminEmail') === 'admin@absfeed.com');
+  const [isManager, setIsManager] = useState(() => safeLocalStorage.getItem('isManager') === 'true');
+  const [activeTab, setActiveTab] = useState<string>('online');
+  const [activeCategory, setActiveCategory] = useState<string>('overview');
+  
+  const [species, setSpecies] = useState<any[]>([]);
+  const [diseases, setDiseases] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [marketPrices, setMarketPrices] = useState<any[]>([]);
+  const [cropCalendar, setCropCalendar] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
+  const [stories, setStories] = useState<any[]>([]);
+  const [problems, setProblems] = useState<any[]>([]);
+  const [marketplace, setMarketplace] = useState<any[]>([]);
+  const [forumPosts, setForumPosts] = useState<any[]>([]);
+  const [loans, setLoans] = useState<any[]>([]);
+  const [loanPayments, setLoanPayments] = useState<any[]>([]);
+  const [protections, setProtections] = useState<any[]>([]);
+  const [protectionUpdates, setProtectionUpdates] = useState<any[]>([]);
+  const [ponaOrders, setPonaOrders] = useState<any[]>([]);
+  const [trainingApps, setTrainingApps] = useState<any[]>([]);
+  const [exportApps, setExportApps] = useState<any[]>([]);
+  const [userMarketPrices, setUserMarketPrices] = useState<any[]>([]);
+  const [coldStorages, setColdStorages] = useState<any[]>([]);
+  const [rentMachines, setRentMachines] = useState<any[]>([]);
+  const [cardApplications, setCardApplications] = useState<any[]>([]);
+  const [agentApps, setAgentApps] = useState<any[]>([]);
+  const [pestWarnings, setPestWarnings] = useState<any[]>([]);
+  const [seedBank, setSeedBank] = useState<any[]>([]);
+  const [livestockHealth, setLivestockHealth] = useState<any[]>([]);
+  const [fishWaterTests, setFishWaterTests] = useState<any[]>([]);
+  const [soilTests, setSoilTests] = useState<any[]>([]);
+  const [mapResources, setMapResources] = useState<any[]>([]);
+  const [knowledgeBase, setKnowledgeBase] = useState<any[]>([]);
+  const [videos, setVideos] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [isAdding, setIsAdding] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  const categories = [
+    {
+      id: 'overview',
+      label: 'Overview',
+      icon: Activity,
+      tabs: ['online', 'problems', 'stories']
+    },
+    {
+      id: 'users',
+      label: 'User Management',
+      icon: Users,
+      tabs: ['users', 'settings']
+    },
+    {
+      id: 'applications',
+      label: 'Applications',
+      icon: Landmark,
+      tabs: ['loans', 'loan-payments', 'protections', 'protection-updates', 'pona', 'training', 'exports', 'cards', 'agents']
+    },
+    {
+      id: 'services',
+      label: 'Services Management',
+      icon: Database,
+      tabs: ['cold-storage', 'rent-machines', 'pest-warnings', 'seed-bank', 'soil-test', 'livestock-health', 'fish-water-test', 'map-resources', 'knowledge-base', 'video-tutorials', 'system-push']
+    },
+    {
+      id: 'content',
+      label: 'Content Edit',
+      icon: Edit2,
+      tabs: ['species', 'diseases', 'products', 'market', 'user-market', 'calendar', 'marketplace', 'forum']
+    }
+  ];
+
+  const getTabLabel = (tab: string) => {
+    switch(tab) {
+      case 'species': return t('livestock');
+      case 'diseases': return t('diseases');
+      case 'products': return t('our_products');
+      case 'market': return 'Admin Market Prices';
+      case 'user-market': return 'User Market Prices';
+      case 'calendar': return 'Crop Calendar';
+      case 'marketplace': return 'Marketplace';
+      case 'forum': return 'Forum';
+      case 'users': return 'User Data';
+      case 'online': return 'Live Monitor';
+      case 'stories': return 'Success Stories';
+      case 'problems': return 'Problem Logs';
+      case 'loans': return 'Loan Apps';
+      case 'loan-payments': return 'Loan Installments';
+      case 'protections': return 'Protection Apps';
+      case 'protection-updates': return 'Protection Updates';
+      case 'pona': return 'Pona Orders';
+      case 'training': return 'Training Apps';
+      case 'exports': return 'Export Apps';
+      case 'cards': return t('bondhu_card');
+      case 'agents': return t('agent_registration');
+      case 'cold-storage': return 'Cold Storage';
+      case 'rent-machines': return 'Rent Machines';
+      case 'pest-warnings': return 'Pest Warnings';
+      case 'seed-bank': return 'Seed Bank';
+      case 'livestock-health': return 'Livestock Health';
+      case 'fish-water-test': return 'Fish Water Tests';
+      case 'map-resources': return t('resource_map');
+      case 'knowledge-base': return t('knowledge_base');
+      case 'video-tutorials': return 'Video Tutorials';
+      case 'system-push': return 'Global Notifications';
+      case 'settings': return 'Role Settings';
+      default: return tab;
+    }
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF() as any;
+    const data = getActiveTabData();
+    if (data.length === 0) return;
+
+    const headers = Object.keys(data[0]).filter(k => k !== 'id' && k !== 'imageUrl' && k !== 'createdAt');
+    const rows = data.map(item => headers.map(h => String(item[h] || '')));
+
+    doc.text(`${getTabLabel(activeTab)} Report`, 14, 15);
+    doc.autoTable({
+      head: [headers.map(h => h.toUpperCase())],
+      body: rows,
+      startY: 20,
+      theme: 'grid',
+      styles: { fontSize: 8 }
+    });
+    doc.save(`${activeTab}_report.pdf`);
+  };
+
+  const exportToExcel = () => {
+    const data = getActiveTabData();
+    if (data.length === 0) return;
+    
+    const cleanData = data.map(({ id, imageUrl, createdAt, ...rest }) => rest);
+    const ws = XLSX.utils.json_to_sheet(cleanData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Report");
+    XLSX.writeFile(wb, `${activeTab}_report.xlsx`);
+  };
+
+  const filterData = (data: any[]) => {
+    if (!searchQuery) return data;
+    const q = searchQuery.toLowerCase();
+    return data.filter(item => {
+      const name = (item.name || item.userName || item.applicantName || item.farmerName || item.title || item.seedName || '').toLowerCase();
+      const phone = (item.phone || item.contact || '').toLowerCase();
+      const email = (item.email || '').toLowerCase();
+      const id = (item.loanId || item.protectionId || item.id || '').toLowerCase();
+      const nid = (item.nidNumber || '').toLowerCase();
+      
+      return name.includes(q) || phone.includes(q) || email.includes(q) || id.includes(q) || nid.includes(q);
+    });
+  };
+
+  const getActiveTabData = () => {
+    switch(activeTab) {
+      case 'species': return species;
+      case 'diseases': return diseases;
+      case 'products': return products;
+      case 'market': return marketPrices;
+      case 'user-market': return userMarketPrices;
+      case 'calendar': return cropCalendar;
+      case 'marketplace': return marketplace;
+      case 'forum': return forumPosts;
+      case 'users': return users;
+      case 'stories': return stories;
+      case 'problems': return problems;
+      case 'loans': return loans;
+      case 'loan-payments': return loanPayments;
+      case 'protections': return protections;
+      case 'protection-updates': return protectionUpdates;
+      case 'pona': return ponaOrders;
+      case 'training': return trainingApps;
+      case 'exports': return exportApps;
+      case 'cards': return cardApplications;
+      case 'agents': return agentApps;
+      case 'cold-storage': return coldStorages;
+      case 'rent-machines': return rentMachines;
+      case 'pest-warnings': return pestWarnings;
+      case 'seed-bank': return seedBank;
+      case 'livestock-health': return livestockHealth;
+      case 'fish-water-test': return fishWaterTests;
+      case 'soil-test': return soilTests;
+      case 'map-resources': return mapResources;
+      case 'knowledge-base': return knowledgeBase;
+      case 'video-tutorials': return videos;
+      case 'system-push': return notifications;
+      default: return [];
+    }
+  };
+
+  const seedData = async () => {
+    setIsSeeding(true);
+    const initialSpecies = [
+      // Livestock (গবাদি পশু)
+      { 
+        name: i18n.language === 'en' ? 'Holstein Friesian Cow' : 'হলস্টাইন ফ্রিজিয়ান গরু', 
+        category: 'livestock', 
+        subCategory: 'Cattle (গরু)',
+        description: i18n.language === 'en' ? 'Renowned dairy cattle breed originating from Friesland.' : 'উচ্চ দুগ্ধ উৎপাদনকারী গাভীর উন্নত জাত।', 
+        farmingMethod: i18n.language === 'en' 
+          ? '1. Select healthy calves.\n2. Provide well-ventilated housing.\n3. Balanced nutrition (70% roughage, 30% concentrate).'
+          : '১. সুস্থ বাছুর নির্বাচন।\n২. আলো-বাতাসপূর্ণ বাসস্থান।\n৩. সুষম খাদ্য ব্যবস্থাপনা (৭০% ঘাস, ৩০% দানাদার)।', 
+        stockingDensity: '50-60 sq.ft per cow', 
+        biosecurity: 'Regular FMD vaccination every 6 months.', 
+        imageUrl: 'https://images.unsplash.com/photo-1546445317-29f4545e9d53?auto=format&fit=crop&q=80&w=800' 
+      },
+      { 
+        name: i18n.language === 'en' ? 'Black Bengal Goat' : 'ব্লাক বেঙ্গল ছাগল', 
+        category: 'livestock', 
+        subCategory: 'Goat (ছাগল)',
+        description: i18n.language === 'en' ? 'Native breed of Bangladesh, known for high quality meat.' : 'মাংস ও চামড়ার জন্য বিশ্বসেরা স্থানীয় জাত।', 
+        farmingMethod: i18n.language === 'en'
+          ? '1. Intensive or semi-intensive rearing.\n2. Vaccination against PPR is mandatory.'
+          : '১. নিবিড় বা আধা-নিবিড় পালন।\n২. পিপিআর টিকাদান বাধ্যতামূলক।', 
+        stockingDensity: '12-15 sq.ft per goat', 
+        biosecurity: 'Keep shed floor dry and clean.', 
+        imageUrl: 'https://images.unsplash.com/photo-1524024973431-2ad916746881?auto=format&fit=crop&q=80&w=800' 
+      },
+      // Poultry (পোল্ট্রি)
+      { 
+        name: i18n.language === 'en' ? 'Cobb 500 Broiler' : 'কব ৫০০ ব্রয়লার', 
+        category: 'poultry', 
+        subCategory: 'Broiler (ব্রয়লার)',
+        description: i18n.language === 'en' ? 'Fast-growing meat bird for commercial production.' : 'বাণিজ্যিক মাংস উৎপাদনের জন্য দ্রুত বর্ধনশীল জাত।', 
+        farmingMethod: 'All-in all-out system. High protein diet. 30-35 day cycle.', 
+        stockingDensity: '1.2 sq.ft per bird', 
+        biosecurity: 'Strict entry restriction. Footbath mandatory.', 
+        imageUrl: 'https://images.unsplash.com/photo-1587132137056-bfbf0166836e?auto=format&fit=crop&q=80&w=800' 
+      },
+      { 
+        name: i18n.language === 'en' ? 'Peking Duck' : 'পিকিং হাঁস', 
+        category: 'poultry', 
+        subCategory: 'Duck (হাঁস)',
+        description: i18n.language === 'en' ? 'Rapidly growing meat-type duck.' : 'দ্রুত বর্ধনশীল মাংস উৎপাদনকারী হাঁস।', 
+        farmingMethod: 'Open pond or backyard system. High humidity environment.', 
+        stockingDensity: '4-5 sq.ft per duck', 
+        biosecurity: 'Duck plague vaccination.', 
+        imageUrl: 'https://images.unsplash.com/photo-1555854816-6aa07bc54f24?auto=format&fit=crop&q=80&w=800' 
+      },
+      // Fisheries (মৎস্য)
+      { 
+        name: i18n.language === 'en' ? 'Rohu (Rui)' : 'রুই মাছ', 
+        category: 'fisheries', 
+        subCategory: 'Carp (কার্প)',
+        description: i18n.language === 'en' ? 'Standard freshwater fish for polyculture.' : 'মিশ্র চাষের জন্য আদর্শ মিষ্টি পানির মাছ।', 
+        farmingMethod: 'Polyculture with Catla and Mrigal. Supplement feed 3% of body weight.', 
+        stockingDensity: '30-40 fish per decimal', 
+        biosecurity: 'Pond liming (1kg/decimal) and netting.', 
+        imageUrl: 'https://images.unsplash.com/photo-1524704654690-b56c05c78a00?auto=format&fit=crop&q=80&w=800' 
+      },
+      { 
+        name: i18n.language === 'en' ? 'Monosex Tilapia' : 'মনোসেক্স তেলাপিয়া', 
+        category: 'fisheries', 
+        subCategory: 'Tilapia (তেলাপিয়া)',
+        description: i18n.language === 'en' ? 'Fast growing and disease resistant.' : 'দ্রুত বর্ধনশীল ও রোগ প্রতিরোধ ক্ষমতা সম্পন্ন।', 
+        farmingMethod: 'Intensive rearing. Floating pellets (30% protein). Aeration needed.', 
+        stockingDensity: '150-200 fish per decimal', 
+        biosecurity: 'Regular water quality check (pH, DO).', 
+        imageUrl: 'https://images.unsplash.com/photo-1534043464124-3be32fe000c9?auto=format&fit=crop&q=80&w=800' 
+      },
+      // Vegetables / Crops (শাকসবজি)
+      { 
+        name: i18n.language === 'en' ? 'BRRI Dhan 28' : 'ব্রি ধান ২৮', 
+        category: 'vegetables', 
+        subCategory: 'Rice (ধান)',
+        description: i18n.language === 'en' ? 'High-yielding Boro rice variety.' : 'উচ্চফলনশীল বোরো ধানের জাত।', 
+        farmingMethod: 'Wait for soil saturation. Use AWD (Alternate Wetting and Drying) method.', 
+        stockingDensity: '25cm line to line spacing', 
+        biosecurity: 'Manage Leaf Roller and Stem Borer.', 
+        imageUrl: 'https://images.unsplash.com/photo-1536633396567-6dc4a5b67a6e?auto=format&fit=crop&q=80&w=800' 
+      },
+      { 
+        name: i18n.language === 'en' ? 'Red Spinach' : 'লাল শাক', 
+        category: 'vegetables', 
+        subCategory: 'Red Spinach (লাল শাক)',
+        description: i18n.language === 'en' ? 'Iron-rich fast growing vegetable.' : 'আয়রণ সমৃদ্ধ দ্রুত বর্ধনশীল শাক।', 
+        farmingMethod: 'Sow in well-drained soil. Harvesting starts from 25 days.', 
+        stockingDensity: 'Broadcast sowing (100g seeds/decimal)', 
+        biosecurity: 'Protect from caterpillars.', 
+        imageUrl: 'https://images.unsplash.com/photo-1594282486512-409ba1990494?auto=format&fit=crop&q=80&w=800' 
+      }
+    ];
+
+    const initialDiseases = [
+      { 
+        title: 'FMD (খুরারোগ)', 
+        speciesId: 'Cow', 
+        description: 'Highly contagious viral disease.', 
+        symptoms: 'Fever, blisters in mouth and on feet, excessive salivation.', 
+        treatment: 'No specific medicine. Wash sores with potassium solution. Antibiotics for secondary infection.' 
+      },
+      { 
+        title: 'Ranikhet (রানীক্ষেত)', 
+        speciesId: 'Poultry', 
+        description: 'Fatal poultry disease.', 
+        symptoms: 'Greenish diarrhea, twisted neck, respiratory distress.', 
+        treatment: 'Prevention through BCRDV and RDV vaccination is key.' 
+      }
+    ];
+
+    const initialProducts = [
+      { name: 'ABS FEED Premium Cattle Feed', category: 'Livestock', description: 'Complete nutrition for dairy cows.', benefits: 'Increases milk fat and volume. Improved digestion.', imageUrl: 'https://images.unsplash.com/photo-1546445317-29f4545e9d53?auto=format&fit=crop&q=80&w=800', orderLink: '#' },
+      { name: 'ABS FEED Aqua Pro Floating', category: 'Fisheries', description: 'High protein fish feed.', benefits: 'Faster growth, cleaner water, better FCR.', imageUrl: 'https://images.unsplash.com/photo-1534043464124-3be32fe000c9?auto=format&fit=crop&q=80&w=800', orderLink: '#' }
+    ];
+
+    const initialMarketPrices = [
+      { name: 'Miniket Rice', price: '68-72', marketPrice: '70', unit: 'kg', change: 'up', trend: '+1.5%', district: 'Dhaka', category: 'Crops' },
+      { name: 'Broiler Chicken', price: '190-210', marketPrice: '195', unit: 'kg', change: 'down', trend: '-2.1%', district: 'Narsingdi', category: 'Poultry' },
+      { name: 'Rui Fish (1kg+)', price: '320-380', marketPrice: '350', unit: 'kg', change: 'stable', trend: '0%', district: 'Mymensingh', category: 'Fish' }
+    ];
+
+    const initialCropCalendar = [
+      { 
+        name: i18n.language === 'en' ? 'Boro Rice' : 'বোরো ধান',
+        season: i18n.language === 'en' ? 'November - May' : 'নভেম্বর - মে', 
+        stage: i18n.language === 'en' ? 'Grain Filling' : 'দানাদার অবস্থা', 
+        tasks: [
+          i18n.language === 'en' ? 'Maintain 2-3cm water level' : '২-৩ সেমি পানি ধরে রাখুন',
+          i18n.language === 'en' ? 'Apply urea at panicle initiation' : 'থোড় আসার সময় ইউরিয়া প্রয়োগ করুন',
+          i18n.language === 'en' ? 'Manage stem borer if needed' : 'মাজরা পোকা দমন করুন'
+        ],
+        color: 'bg-emerald-500',
+        guide: {
+          en: "Boro rice requires constant irrigation. Keep the soil saturated but not over-flooded.",
+          bn: "বোরো ধানের জন্য নিয়মিত সেচ প্রয়োজন। জমি সবসময় ভেজা রাখুন কিন্তু জলাবদ্ধ করবেন না।"
+        }
+      },
+      { 
+        name: i18n.language === 'en' ? 'Potato' : 'আলু', 
+        season: i18n.language === 'en' ? 'November - February' : 'নভেম্বর - ফেব্রুয়ারি', 
+        stage: i18n.language === 'en' ? 'Tuber Formation' : 'টিউবার গঠন', 
+        tasks: [
+          i18n.language === 'en' ? 'Earthing up twice' : 'দুইবার মাটি আলগা করে উচিয়ে দিন',
+          i18n.language === 'en' ? 'Check for Late Blight' : 'নাবি ধসা রোগের জন্য পর্যবেক্ষণ করুন',
+          i18n.language === 'en' ? 'Potassium application' : 'পটাশ সার প্রয়োগ'
+        ],
+        color: 'bg-[#8D6E63]',
+        guide: {
+          en: "Potato is high value cash crop. Late blight is the biggest threat in foggy weather.",
+          bn: "আলু একটি মূল্যবান অর্থকরী ফসল। কুয়াশাচ্ছন্ন আবহাওয়ায় নাবি ধসা রোগের ঝুঁকি থাকে।"
+        }
+      },
+      { 
+        name: i18n.language === 'en' ? 'Jute' : 'পাট', 
+        season: i18n.language === 'en' ? 'March - August' : 'মার্চ - আগস্ট', 
+        stage: i18n.language === 'en' ? 'Fiber Activation' : 'আঁশ গঠন', 
+        tasks: [
+          i18n.language === 'en' ? 'Thinning the rows' : 'সারি পাতলা করা',
+          i18n.language === 'en' ? 'Top dressing of Urea' : 'ইউরিয়া উপরি প্রয়োগ',
+          i18n.language === 'en' ? 'Monitor for Hairy Caterpillar' : 'বিছা পোকা দমন'
+        ],
+        color: 'bg-green-600',
+        guide: {
+          en: "Jute fiber quality depends on retting process. Ensure clear water for retting.",
+          bn: "পাটের আঁশের মান জাগ দেয়ার ওপর নির্ভর করে। পরিষ্কার পানিতে জাগ দিন।"
+        }
+      },
+      { 
+        name: i18n.language === 'en' ? 'Mango' : 'আম', 
+        season: i18n.language === 'en' ? 'January - July' : 'জানুয়ারি - জুলাই', 
+        stage: i18n.language === 'en' ? 'Fruit Maturing' : 'ফল পরিপক্বতা', 
+        tasks: [
+          i18n.language === 'en' ? 'Fruit bagging' : 'ফ্রুট ব্যাগিং',
+          i18n.language === 'en' ? 'Manage Hopper infestation' : 'হপার পোকা দমন',
+          i18n.language === 'en' ? 'Irrigation in dry spell' : 'শুকনো সময় সেচ প্রদান'
+        ],
+        color: 'bg-orange-500',
+        guide: {
+          en: "Protect mangoes from heat wave. Use bagging to avoid chemical use in fruits.",
+          bn: "আমকে অতিরিক্ত তাপ থেকে রক্ষা করুন। বিষমুক্ত ফল পেতে ব্যাগিং পদ্ধতি ব্যবহার করুন।"
+        }
+      }
+    ];
+
+    const initialColdStorages = [
+      { name: 'Munshiganj Central Cold Storage', district: 'Munshiganj', location: 'Mukterpur', phone: '01711000111', capacity: '5000 Tons', availableSpace: '1200 Tons', createdAt: serverTimestamp() },
+      { name: 'Rajshahi Aman Cold Storage', district: 'Rajshahi', location: 'Paba', phone: '01711000222', capacity: '3000 Tons', availableSpace: '500 Tons', createdAt: serverTimestamp() },
+      { name: 'Bogra Himagar Ltd', district: 'Bogra', location: 'Sherpur', phone: '01711000333', capacity: '4500 Tons', availableSpace: '2000 Tons', createdAt: serverTimestamp() },
+      { name: 'Comilla Farmers Cold Storage', district: 'Comilla', location: 'Chandina', phone: '01711000444', capacity: '4000 Tons', availableSpace: '800 Tons', createdAt: serverTimestamp() },
+      { name: 'Rangpur Potato Storage', district: 'Rangpur', location: 'Mithapukur', phone: '01711000555', capacity: '6000 Tons', availableSpace: '1500 Tons', createdAt: serverTimestamp() },
+      { name: 'Dinajpur Agro Storage', district: 'Dinajpur', location: 'Sadar', phone: '01711000666', capacity: '3500 Tons', availableSpace: '1000 Tons', createdAt: serverTimestamp() },
+      { name: 'Pabna Onion Storage', district: 'Pabna', location: 'Ishwardi', phone: '01711000777', capacity: '2500 Tons', availableSpace: '300 Tons', createdAt: serverTimestamp() },
+      { name: 'Jessore Vegetable Cold Storage', district: 'Jessore', location: 'Monirampur', phone: '01711000888', capacity: '4000 Tons', availableSpace: '1200 Tons', createdAt: serverTimestamp() },
+      { name: 'Natore Seed Storage', district: 'Natore', location: 'Sadar', phone: '01711000999', capacity: '2000 Tons', availableSpace: '600 Tons', createdAt: serverTimestamp() },
+      { name: 'Mymensingh Fish Storage', district: 'Mymensingh', location: 'Trishal', phone: '01711000000', capacity: '3000 Tons', availableSpace: '400 Tons', createdAt: serverTimestamp() }
+    ];
+
+    const initialPestWarnings = [
+      { title: 'Late Blight of Potato (আলুর মড়ক)', area: 'North Bengal', severity: 'high', description: 'Potato late blight is spreading due to foggy weather. Avoid excessive Urea fertilizer as it increases susceptibility. Use Mancozeb based fungicides.', createdAt: serverTimestamp() },
+      { title: 'Rice Blast Warning (ধানের ব্লাস্ট)', area: 'Mymensingh', severity: 'medium', description: 'Rice blast detected in some fields. Maintain proper water level and avoid high nitrogen fertilizer application at this stage.', createdAt: serverTimestamp() },
+      { title: 'Fertilizer Management (সার ব্যবস্থাপনা)', area: 'All over Bangladesh', severity: 'low', description: 'Using excessive Urea and DAP without organic fertilizer reduces soil health. Always use balanced doses of N-P-K.', createdAt: serverTimestamp() },
+      { title: 'Fall Armyworm Alert (ভুট্টার পোকা)', area: 'Chuadanga, Jhenaidah', severity: 'high', description: 'Fall Armyworm infestation reported in maize fields. Monitor fields daily and use recommended bio-pesticides.', createdAt: serverTimestamp() },
+      { title: 'Mango Hopper Warning (আমের হপার পোকা)', area: 'Rajshahi, Chapainawabganj', severity: 'medium', description: 'Mango hopper attack possible during flowering. Spray recommended insecticides before full bloom.', createdAt: serverTimestamp() },
+      { title: 'Boro Rice Stem Borer (মাজরা পোকা)', area: 'Sylhet Division', severity: 'medium', description: 'Stem borer infestation seen in Boro rice. Use light traps and perching method for natural control.', createdAt: serverTimestamp() }
+    ];
+
+    const initialStories = [
+      {
+        userName: 'আরিফ হোসেন',
+        content: 'আলহামদুলিল্লাহ, এবছর এবিএস ফীড (ABS FEED) ব্যবহার করে আমার খামারের গরুর স্বাস্থ্য অনেক ভালো হয়েছে। দুধের উৎপাদনও বেড়েছে প্রায় ২০%।',
+        likesCount: 5,
+        commentsCount: 2,
+        createdAt: serverTimestamp(),
+        imageUrl: 'https://images.unsplash.com/photo-1546445317-29f4545e9d53?auto=format&fit=crop&q=80&w=800'
+      }
+    ];
+
+    const initialKnowledgeBase = [
+      {
+        order: 1,
+        title_en: 'Modern Rice Cultivation Techniques',
+        title_bn: 'আধুনিক ধান চাষ পদ্ধতি',
+        category: 'Agriculture',
+        content_en: 'To get higher yield, use AWD method for irrigation. Ensure balanced use of Nitrogen, Phosphate and Potassium fertilizers. Use parching method for natural pest control.',
+        content_bn: 'অধিক ফলনের জন্য এ ডব্লিউ ডি পদ্ধতিতে সেচ দিন। নাইট্রোজেন, ফসফেট ও পটাশ সারের সুষম ব্যবহার নিশ্চিত করুন। প্রাকৃতিক পোকা দমনের জন্য পার্চিং পদ্ধতি ব্যবহার করুন।',
+        imageUrl: 'https://picsum.photos/seed/rice/800/600'
+      },
+      {
+        order: 2,
+        title_en: 'High Yielding Poultry Management',
+        title_bn: 'উচ্চফলনশীল পোল্ট্রি ব্যবস্থাপনা',
+        category: 'Poultry',
+        content_en: 'Maintain strict biosecurity to prevent diseases. Early vaccination is mandatory for Ranikhet and Gumboro diseases. Provide clean drinking water at all times.',
+        content_bn: 'রোগ প্রতিরোধে কঠোর বায়োসিকিউরিটি বজায় রাখুন। রানীক্ষেত এবং গামবোরো রোগের জন্য আগাম টিকাদান বাধ্যতামূলক। সবসময় পরিষ্কার পানীয় জল নিশ্চিত করুন।',
+        imageUrl: 'https://picsum.photos/seed/poultry/800/600'
+      },
+      {
+        order: 3,
+        title_en: 'Carp Polyculture Guide',
+        title_bn: 'কার্প মিশ্র চাষ নির্দেশিকা',
+        category: 'Fisheries',
+        content_en: 'Mixing Rui, Catla and Mrigal increases pond productivity. Maintain water pH between 7.5 to 8.5 for optimal growth.',
+        content_bn: 'রুই, কাতলা ও মৃগেল মাছের মিশ্র চাষ পুকুরের উৎপাদনশীলতা বৃদ্ধি করে। ভালো বৃদ্ধির জন্য পানির পিএইচ ৭.৫ থেকে ৮.৫ এর মধ্যে রাখুন।',
+        imageUrl: 'https://picsum.photos/seed/fish/800/600'
+      },
+      {
+        order: 4,
+        title_en: 'Livestock Fattening Guide',
+        title_bn: 'গবাদি পশু মোটাতাজাকরণ নির্দেশিকা',
+        category: 'Livestock',
+        content_en: 'Balanced diet and regular health checkups are key to successful livestock farming. Use urea molasses straw for better results.',
+        content_bn: 'সফল গবাদি পশু পালনের জন্য সুষম খাদ্য এবং নিয়মিত স্বাস্থ্য পরীক্ষা জরুরি। ভালো ফলাফলের জন্য ইউরিয়া গুড় খড় ব্যবহার করুন।',
+        imageUrl: 'https://picsum.photos/seed/cow/800/600'
+      },
+      {
+        order: 5,
+        title_en: 'Pest Management in Vegetables',
+        title_bn: 'শাকসবজিতে বালাই ব্যবস্থাপনা',
+        category: 'Pest Control',
+        content_en: 'Identify common pests early. Use organic pesticides and pheromone traps to minimize crop damage.',
+        content_bn: 'সাধারণ বালাইগুলো আগে থেকেই শনাক্ত করুন। ফসলের ক্ষতি কমাতে জৈব বালাইনাশক এবং ফেরোমোন ট্র্যাপ ব্যবহার করুন।',
+        imageUrl: 'https://picsum.photos/seed/pest/800/600'
+      },
+      {
+        order: 6,
+        title_en: 'Organic Fertilizer Preparation',
+        title_bn: 'জৈব সার প্রস্তুতকরণ',
+        category: 'Agriculture',
+        content_en: 'Composting is an excellent way to turn farm waste into nutrient-rich soil. Use cow dung, straw, and kitchen waste.',
+        content_bn: 'খামারের বর্জ্যকে পুষ্টিসমৃদ্ধ মাটিতে পরিণত করার জন্য কম্পোস্টিং একটি চমৎকার উপায়। গোবর, খড় এবং রান্নাঘরের বর্জ্য ব্যবহার করুন।',
+        imageUrl: 'https://picsum.photos/seed/compost/800/600'
+      },
+      {
+        order: 7,
+        title_en: 'Winter Vegetable Care',
+        title_bn: 'শীতকালীন সবজির যত্ন',
+        category: 'Agriculture',
+        content_en: 'Mulching helps retain soil moisture during winter. Early morning irrigation is best for winter crops.',
+        content_bn: 'শীতকালে মালচিং মাটির আর্দ্রতা বজায় রাখতে সাহায্য করে। শীতকালীন ফসলের জন্য ভোরে সেচ দেওয়া সবচেয়ে ভালো।',
+        imageUrl: 'https://picsum.photos/seed/winter/800/600'
+      }
+    ];
+
+    const initialMarketplace = [
+      { name: 'Fresh Organic Tomatoes', price: '40', unit: 'kg', category: 'Vegetables', contact: '01700000000', district: 'Rajshahi', description: 'Grown without pesticides.' },
+      { name: 'Native Variety Rice Seed', price: '120', unit: 'kg', category: 'Crops', contact: '01711111111', district: 'Bogura', description: 'High germination rate.' }
+    ];
+
+    const initialForumPosts = [
+      { title: 'Best fertilizer for Boro rice?', category: 'Crops', content: 'What is the recommended NPK ratio for BRRI 28?', authorName: 'Arif' },
+      { title: 'Looking for a seed drill machine', category: 'General', content: 'Where can I rent a seed drill in Jessore?', authorName: 'Kashem' }
+    ];
+
+    const initialSeedBank = [
+      { seedName_en: 'Kalijira Rice', seedName_bn: 'কালিজিরা চাল', variety_en: 'Native', variety_bn: 'দেশি', district_en: 'Dinajpur', district_bn: 'দিনাজপুর', contact: '01722222222', type: 'offer' }
+    ];
+
+    const initialLoans = [
+      { applicantName: 'Mominul Islam', phone: '01733333333', amount: '50000', purpose: 'Dairy expansion', status: 'pending' }
+    ];
+
+    const initialProtections = [
+      { name: 'Salim Ahmed', phone: '01744444444', cropType: 'Rice', totalValue: '100000', status: 'pending' }
+    ];
+
+    const initialAgentApps = [
+      { name: 'Jamal Uddin', phone: '01755555555', shopName: 'Jamal Krishi Bhandar', address: 'Gazipur', status: 'pending' }
+    ];
+
+    const initialLivestockHealth = [
+      { ownerName: 'Abul Mansur', phone: '01712345678', animalType: 'Cattle', symptoms: 'Fever and low appetite', status: 'pending' }
+    ];
+
+    const initialFishWaterTests = [
+      { ownerName: 'Kabir Hasan', phone: '01787654321', parameters: ['ph', 'ammonia', 'oxygen'], status: 'pending' }
+    ];
+
+    const initialVideos = [
+      {
+        title: 'Modern Rice Cultivation Techniques in Bangladesh',
+        titleBn: 'বাংলাদেশে আধুনিক ধান চাষ পদ্ধতি ও কৌশল',
+        thumbnail: 'https://images.unsplash.com/photo-1536633396567-6dc4a5b67a6e?auto=format&fit=crop&q=80&w=800',
+        duration: '12:45',
+        views: '25K',
+        category: 'Crops',
+        categoryBn: 'ফসল',
+        url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+        channel: 'Krishi Bondhu Official',
+        publishedAt: '2 days ago',
+        publishedAtBn: '২ দিন আগে'
+      },
+      {
+        title: 'High Yield Poultry Farming Full Guide 2024',
+        titleBn: 'উন্নত জাতের মুরগি পালন ও খামার পরিচালনা নির্দেশিকা',
+        thumbnail: 'https://images.unsplash.com/photo-1548550023-2bdb3c5beed7?auto=format&fit=crop&q=80&w=800',
+        duration: '15:20',
+        views: '18K',
+        category: 'Poultry',
+        categoryBn: 'হাঁস-মুরগি',
+        url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+        channel: 'ABS Feed Industries',
+        publishedAt: '1 week ago',
+        publishedAtBn: '১ সপ্তাহ আগে'
+      }
+    ];
+
+    if (!auth.currentUser) {
+      alert("Please wait for authentication to initialize.");
+      setIsSeeding(false);
+      return;
+    }
+
+    const uid = auth.currentUser.uid;
+
+    try {
+      // Add Marketplace
+      for (const p of initialMarketplace) {
+        await addDoc(collection(db, 'marketplace'), {
+          ...p,
+          sellerId: uid,
+          sellerName: 'Farmer Admin',
+          createdAt: serverTimestamp()
+        });
+      }
+
+      // Add Forum Posts
+      for (const post of initialForumPosts) {
+        await addDoc(collection(db, 'forumPosts'), {
+          ...post,
+          authorId: uid,
+          createdAt: serverTimestamp()
+        });
+      }
+
+      // Add Stories
+      for (const story of initialStories) {
+        await addDoc(collection(db, 'stories'), {
+          ...story,
+          userId: uid
+        });
+      }
+
+      // Add Livestock Health Requests
+      for (const req of initialLivestockHealth) {
+        await addDoc(collection(db, 'livestockHealthRequests'), {
+          ...req,
+          userId: uid,
+          createdAt: serverTimestamp()
+        });
+      }
+
+      // Add Fish Water Test Requests
+      for (const req of initialFishWaterTests) {
+        await addDoc(collection(db, 'fishWaterTestRequests'), {
+          ...req,
+          userId: uid,
+          createdAt: serverTimestamp()
+        });
+      }
+
+      // Add Species and store their IDs
+      const speciesIds: Record<string, string> = {};
+      for (const s of initialSpecies) {
+        const docRef = await addDoc(collection(db, 'species'), s);
+        // Map the name (or part of it) to the ID
+        const key = s.name.split(' ')[0]; // e.g., 'Cow'
+        speciesIds[key] = docRef.id;
+      }
+      
+      // Add Diseases with correct speciesId
+      for (const d of initialDiseases) {
+        const linkedId = speciesIds[d.speciesId];
+        if (linkedId) {
+          await addDoc(collection(db, 'diseases'), { ...d, speciesId: linkedId });
+        }
+      }
+
+      // Add Products
+      for (const p of initialProducts) {
+        await addDoc(collection(db, 'products'), p);
+      }
+
+      // Add Market Prices
+      for (const m of initialMarketPrices) {
+        await addDoc(collection(db, 'marketPrices'), m);
+      }
+
+      // Add Crop Calendar
+      for (const c of initialCropCalendar) {
+        await addDoc(collection(db, 'cropCalendar'), c);
+      }
+
+      // Add Cold Storages
+      for (const cs of initialColdStorages) {
+        await addDoc(collection(db, 'coldStorage'), cs);
+      }
+
+      // Add Pest Warnings
+      for (const pw of initialPestWarnings) {
+        await addDoc(collection(db, 'pestWarnings'), pw);
+      }
+
+      // Add Seed Bank
+      for (const s of initialSeedBank) {
+        await addDoc(collection(db, 'seedBank'), {
+          ...s,
+          userId: uid,
+          userName: 'Farmer Admin',
+          createdAt: serverTimestamp()
+        });
+      }
+
+      // Add Loan Apps
+      for (const l of initialLoans) {
+        await addDoc(collection(db, 'loanApplications'), { ...l, userId: uid, createdAt: serverTimestamp() });
+      }
+
+      // Add Protection Apps
+      for (const p of initialProtections) {
+        await addDoc(collection(db, 'protectionApplications'), { ...p, userId: uid, createdAt: serverTimestamp() });
+      }
+
+      // Add Agent Apps
+      for (const a of initialAgentApps) {
+        await addDoc(collection(db, 'agentApplications'), { ...a, userId: uid, createdAt: serverTimestamp() });
+      }
+
+      // Add Knowledge Base
+      for (const article of initialKnowledgeBase) {
+        await addDoc(collection(db, 'knowledgeBase'), {
+          ...article,
+          active: true,
+          createdAt: serverTimestamp()
+        });
+      }
+
+      // Add Videos
+      for (const video of initialVideos) {
+        await addDoc(collection(db, 'videos'), {
+          ...video,
+          createdAt: serverTimestamp()
+        });
+      }
+      
+      alert("Comprehensive farming database seeded successfully!");
+    } catch (err) {
+      console.error("Seed error", err);
+      alert("Error seeding data. Check console.");
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
+  useEffect(() => {
+    let storageAdmin = safeLocalStorage.getItem('isAdmin') === 'true';
+    let storageManager = safeLocalStorage.getItem('isManager') === 'true';
+    
+    if (storageAdmin || storageManager) {
+      setIsAdmin(storageAdmin);
+      setIsManager(storageManager);
+      if (storageManager && !storageAdmin) {
+        setActiveTab('users');
+      }
+    } else if (!isAdmin && !isManager) {
+      navigate('/login');
+    }
+  }, [navigate]);
+
+  useEffect(() => {
+    // We need the session flag to be ready.
+    // If auth.currentUser is missing, we wait for it to avoid permission errors
+    // unless we are specifically handling unauthenticated access (which we aren't for users/online)
+    if (!(isAdmin || isManager) || !auth.currentUser) return;
+
+    const unsubSpecies = onSnapshot(collection(db, 'species'), (s) => setSpecies(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'species'));
+    const unsubDiseases = onSnapshot(collection(db, 'diseases'), (s) => setDiseases(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'diseases'));
+    const unsubProducts = onSnapshot(collection(db, 'products'), (s) => setProducts(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'products'));
+    const unsubMarket = onSnapshot(collection(db, 'marketPrices'), (s) => setMarketPrices(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'marketPrices'));
+    const unsubCalendar = onSnapshot(collection(db, 'cropCalendar'), (s) => setCropCalendar(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'cropCalendar'));
+    const unsubUsers = onSnapshot(collection(db, 'users'), (s) => setUsers(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'users'));
+    const unsubOnline = onSnapshot(collection(db, 'onlineUsers'), (s) => {
+      const now = Date.now();
+      const online = s.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter((u: any) => u.lastSeen && typeof u.lastSeen.toMillis === 'function' && u.lastSeen.toMillis() > now - 300000); // Online if seen in last 5 mins
+      setOnlineUsers(online);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'onlineUsers'));
+
+    const unsubStories = onSnapshot(collection(db, 'stories'), (s) => setStories(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'stories'));
+    const unsubProblems = onSnapshot(collection(db, 'problemLogs'), (s) => setProblems(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'problemLogs'));
+    const unsubMarketplace = onSnapshot(collection(db, 'marketplace'), (s) => setMarketplace(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'marketplace'));
+    const unsubForum = onSnapshot(collection(db, 'forumPosts'), (s) => setForumPosts(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'forumPosts'));
+    const unsubLoans = onSnapshot(collection(db, 'loanApplications'), (s) => setLoans(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'loanApplications'));
+    const unsubLoanPayments = onSnapshot(collection(db, 'loanPayments'), (s) => setLoanPayments(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'loanPayments'));
+    const unsubProtections = onSnapshot(collection(db, 'protectionApplications'), (s) => setProtections(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'protectionApplications'));
+    const unsubProtectionUpdates = onSnapshot(collection(db, 'protectionUpdates'), (s) => setProtectionUpdates(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'protectionUpdates'));
+    const unsubPona = onSnapshot(collection(db, 'ponaOrders'), (s) => setPonaOrders(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'ponaOrders'));
+    const unsubTraining = onSnapshot(collection(db, 'trainingApplications'), (s) => setTrainingApps(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'trainingApplications'));
+    const unsubExports = onSnapshot(collection(db, 'exportApplications'), (s) => setExportApps(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'exportApplications'));
+    const unsubUserMarket = onSnapshot(collection(db, 'userMarketPrices'), (s) => setUserMarketPrices(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'userMarketPrices'));
+    const unsubColdStorage = onSnapshot(collection(db, 'coldStorage'), (s) => setColdStorages(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'coldStorage'));
+    const unsubRentMachines = onSnapshot(collection(db, 'rentMachines'), (s) => setRentMachines(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'rentMachines'));
+    const unsubCardApps = onSnapshot(collection(db, 'cardApplications'), (s) => setCardApplications(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'cardApplications'));
+    const unsubPestWarnings = onSnapshot(collection(db, 'pestWarnings'), (s) => setPestWarnings(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'pestWarnings'));
+    const unsubSeedBank = onSnapshot(collection(db, 'seedBank'), (s) => setSeedBank(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'seedBank'));
+    const unsubLivestockHealth = onSnapshot(collection(db, 'livestockHealthRequests'), (s) => setLivestockHealth(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'livestockHealthRequests'));
+    const unsubFishWaterTest = onSnapshot(collection(db, 'fishWaterTestRequests'), (s) => setFishWaterTests(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'fishWaterTestRequests'));
+    const unsubSoilTests = onSnapshot(collection(db, 'soilTestRequests'), (s) => setSoilTests(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'soilTestRequests'));
+    const unsubMap = onSnapshot(collection(db, 'mapResources'), (s) => setMapResources(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'mapResources'));
+    const unsubKnowledge = onSnapshot(collection(db, 'knowledgeBase'), (s) => setKnowledgeBase(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'knowledgeBase'));
+    const unsubVideos = onSnapshot(collection(db, 'videos'), (s) => setVideos(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'videos'));
+    const unsubAgentApps = onSnapshot(collection(db, 'agentApplications'), (s) => setAgentApps(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'agentApplications'));
+    const unsubNotifs = onSnapshot(collection(db, 'notifications'), (s) => setNotifications(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'notifications'));
+
+    return () => {
+      unsubSpecies();
+      unsubDiseases();
+      unsubProducts();
+      unsubMarket();
+      unsubCalendar();
+      unsubUsers();
+      unsubOnline();
+      unsubStories();
+      unsubProblems();
+      unsubMarketplace();
+      unsubForum();
+      unsubLoans();
+      unsubLoanPayments();
+      unsubProtections();
+      unsubProtectionUpdates();
+      unsubPona();
+      unsubTraining();
+      unsubExports();
+      unsubUserMarket();
+      unsubColdStorage();
+      unsubRentMachines();
+      unsubCardApps();
+      unsubPestWarnings();
+      unsubSeedBank();
+      unsubLivestockHealth();
+      unsubFishWaterTest();
+      unsubSoilTests();
+      unsubMap();
+      unsubKnowledge();
+      unsubVideos();
+      unsubAgentApps();
+      unsubNotifs();
+    };
+  }, [isAdmin, auth.currentUser]); // Add auth.currentUser to dependencies
+
+  const handleSave = async (data: any) => {
+    try {
+      const collectionName = activeTab === 'market' ? 'marketPrices' : 
+                            activeTab === 'user-market' ? 'userMarketPrices' :
+                            activeTab === 'calendar' ? 'cropCalendar' : 
+                            activeTab === 'problems' ? 'problemLogs' : 
+                            activeTab === 'forum' ? 'forumPosts' : 
+                            activeTab === 'loans' ? 'loanApplications' :
+                            activeTab === 'protections' ? 'protectionApplications' :
+                            activeTab === 'pona' ? 'ponaOrders' :
+                            activeTab === 'exports' ? 'exportApplications' :
+                            activeTab === 'training' ? 'trainingApplications' : 
+                            activeTab === 'cold-storage' ? 'coldStorage' :
+                            activeTab === 'rent-machines' ? 'rentMachines' :
+                            activeTab === 'pest-warnings' ? 'pestWarnings' :
+                            activeTab === 'seed-bank' ? 'seedBank' :
+                            activeTab === 'map-resources' ? 'mapResources' :
+                            activeTab === 'knowledge-base' ? 'knowledgeBase' :
+                            activeTab === 'video-tutorials' ? 'videos' :
+                            activeTab === 'stories' ? 'stories' :
+                            activeTab === 'agents' ? 'agentApplications' :
+                            activeTab === 'loan-payments' ? 'loanPayments' :
+                            activeTab === 'protection-updates' ? 'protectionUpdates' :
+                            activeTab === 'settings' ? 'users' :
+                            activeTab === 'cards' ? 'cardApplications' : activeTab;
+      
+      if (editingItem) {
+        await updateDoc(doc(db, collectionName, editingItem.id), data);
+      } else {
+        const uid = auth.currentUser?.uid;
+        const finalData = { ...data };
+        
+        // Inject userId for collections that require it
+        if (uid && [
+          'stories', 'problemLogs', 'marketplace', 'forumPosts', 
+          'userMarketPrices', 'exportApplications', 'loanApplications', 
+          'protectionApplications', 'ponaOrders', 'trainingApplications',
+          'agentApplications', 'cardApplications', 'seedBank', 'farmingLedger',
+          'farmJournal'
+        ].includes(collectionName)) {
+          if (!finalData.userId && !finalData.sellerId && !finalData.authorId) {
+            finalData.userId = uid;
+          }
+          // Some collections use specific ID fields
+          if (collectionName === 'marketplace' && !finalData.sellerId) finalData.sellerId = uid;
+          if (collectionName === 'forumPosts' && !finalData.authorId) finalData.authorId = uid;
+        }
+
+        await addDoc(collection(db, collectionName), {
+          ...finalData,
+          createdAt: serverTimestamp()
+        });
+
+        // Trigger notifications for critical alerts
+        if (collectionName === 'pestWarnings') {
+          await addDoc(collection(db, 'notifications'), {
+            title: 'পোকামাকড় আক্রমণ সতর্কতা! (Pest Alert)',
+            body: `${data.title} - ${data.area}`,
+            type: 'warning',
+            userId: 'all',
+            read: false,
+            createdAt: serverTimestamp()
+          });
+        } else if (collectionName === 'system-push') {
+          await addDoc(collection(db, 'notifications'), {
+            title: data.title,
+            body: data.body,
+            type: data.type || 'info',
+            userId: 'all',
+            read: false,
+            createdAt: serverTimestamp()
+          });
+        }
+      }
+      setEditingItem(null);
+      setIsAdding(false);
+    } catch (err) {
+      console.error("Save error", err);
+      alert("Failed to save. Check permissions.");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm("Are you sure?")) {
+      try {
+        const collectionName = activeTab === 'market' ? 'marketPrices' : 
+                              activeTab === 'user-market' ? 'userMarketPrices' :
+                              activeTab === 'calendar' ? 'cropCalendar' : 
+                              activeTab === 'problems' ? 'problemLogs' : 
+                              activeTab === 'loans' ? 'loanApplications' :
+                              activeTab === 'protections' ? 'protectionApplications' :
+                              activeTab === 'pona' ? 'ponaOrders' :
+                              activeTab === 'exports' ? 'exportApplications' :
+                              activeTab === 'training' ? 'trainingApplications' : 
+                              activeTab === 'cold-storage' ? 'coldStorage' :
+                              activeTab === 'rent-machines' ? 'rentMachines' :
+                              activeTab === 'pest-warnings' ? 'pestWarnings' :
+                              activeTab === 'seed-bank' ? 'seedBank' :
+                              activeTab === 'map-resources' ? 'mapResources' :
+                              activeTab === 'knowledge-base' ? 'knowledgeBase' :
+                              activeTab === 'agents' ? 'agentApplications' :
+                              activeTab === 'loan-payments' ? 'loanPayments' :
+                              activeTab === 'protection-updates' ? 'protectionUpdates' :
+                              activeTab === 'stories' ? 'stories' :
+                              activeTab === 'settings' ? 'users' :
+                              activeTab === 'cards' ? 'cardApplications' : activeTab;
+        await deleteDoc(doc(db, collectionName, id));
+      } catch (err) {
+        console.error("Delete error", err);
+        alert("Failed to delete.");
+      }
+    }
+  };
+
+  if (!(isAdmin || isManager)) return null;
+
+  return (
+    <div className="min-h-[80vh] flex flex-col md:flex-row gap-8">
+      {/* Sidebar */}
+      <div className="w-full md:w-72 shrink-0 space-y-6">
+        <div className="bg-white rounded-[2rem] border border-[#E0E8E0] p-4 shadow-sm">
+          <div className="p-4 mb-4">
+            <h1 className="text-2xl font-black text-[#1B301B] uppercase tracking-tight">Admin <span className="text-[#4CAF50]">Hub</span></h1>
+            <p className="text-xs text-[#8BA88B] font-bold uppercase tracking-widest mt-1">Management Console</p>
+          </div>
+          
+          <nav className="space-y-2">
+            {categories.filter(cat => {
+              if (isManager && !isAdmin) {
+                return cat.id !== 'content';
+              }
+              return true;
+            }).map((cat) => (
+              <div key={cat.id} className="space-y-1">
+                <button
+                  onClick={() => setActiveCategory(activeCategory === cat.id ? '' : cat.id)}
+                  className={cn(
+                    "w-full flex items-center justify-between p-4 rounded-2xl font-bold transition-all",
+                    activeCategory === cat.id ? "bg-[#4CAF50] text-white shadow-lg shadow-green-900/20" : "text-[#556B55] hover:bg-[#F0F5F0]"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <cat.icon size={20} />
+                    <span>{cat.label}</span>
+                  </div>
+                  <ChevronRight size={16} className={cn("transition-transform", activeCategory === cat.id && "rotate-90")} />
+                </button>
+                
+                <AnimatePresence>
+                  {activeCategory === cat.id && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden pl-4 space-y-1"
+                    >
+                      {cat.tabs.filter(tab => {
+                        if (isManager && !isAdmin) {
+                          return tab !== 'settings';
+                        }
+                        return true;
+                      }).map(tab => (
+                        <button
+                          key={tab}
+                          onClick={() => {
+                            setActiveTab(tab);
+                            setEditingItem(null);
+                            setIsAdding(false);
+                          }}
+                          className={cn(
+                            "w-full text-left p-3 rounded-xl text-sm font-bold transition-all",
+                            activeTab === tab ? "text-[#4CAF50] bg-[#F0F5F0]" : "text-[#8BA88B] hover:text-[#556B55]"
+                          )}
+                        >
+                          {getTabLabel(tab)}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ))}
+          </nav>
+
+          <div className="mt-8 pt-6 border-t border-[#E0E8E0]">
+            <button
+              onClick={seedData}
+              disabled={isSeeding}
+              className="w-full flex items-center justify-center gap-2 p-4 bg-[#F0F5F0] text-[#2E7D32] rounded-2xl font-bold hover:bg-[#E8F5E9] transition-all text-sm disabled:opacity-50"
+            >
+              {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <Database size={16} />}
+              {t('admin_seed')}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 space-y-8">
+        <header className="flex flex-col items-center text-center gap-4 bg-white p-8 rounded-[3rem] border border-[#E0E8E0] shadow-sm">
+          <div className="space-y-2">
+            <h2 className="text-4xl font-black text-[#1B301B] uppercase tracking-tight leading-none">{getTabLabel(activeTab)}</h2>
+            <p className="text-[#556B55] font-medium text-sm">Manage your {activeTab} data and system settings.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="px-5 py-2 bg-green-50 rounded-full border border-green-100 text-[10px] font-black uppercase tracking-[0.2em] text-[#2E7D32] flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              KGF Live Monitor
+            </div>
+          </div>
+        </header>
+
+      {activeTab === 'online' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white p-6 rounded-3xl border border-[#E0E8E0] shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center">
+              <Activity size={24} />
+            </div>
+            <div>
+              <p className="text-sm text-[#556B55]">Currently Online</p>
+              <h3 className="text-2xl font-bold">{onlineUsers.length}</h3>
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-3xl border border-[#E0E8E0] shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center">
+              <Users size={24} />
+            </div>
+            <div>
+              <p className="text-sm text-[#556B55]">Total Registered</p>
+              <h3 className="text-2xl font-bold">{users.length}</h3>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-3xl border border-[#E0E8E0] shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-[#E0E8E0] flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-bold capitalize">{activeTab} List</h2>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Send size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8BA88B]" />
+                <input
+                  type="text"
+                  placeholder={i18n.language === 'en' ? "Search by ID or Phone..." : "আইডি বা ফোন দিয়ে খুঁজুন..."}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 py-2 bg-[#F9FBF9] border border-[#E0E8E0] rounded-xl text-sm focus:ring-2 focus:ring-[#4CAF50] outline-none w-48 sm:w-64 transition-all"
+                />
+              </div>
+              <button 
+                onClick={exportToPDF}
+                className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all"
+                title="Export to PDF"
+              >
+                <FileDown size={18} />
+              </button>
+              <button 
+                onClick={exportToExcel}
+                className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-all"
+                title="Export to Excel"
+              >
+                <FileSpreadsheet size={18} />
+              </button>
+            </div>
+          </div>
+          {['species', 'diseases', 'products', 'market', 'calendar', 'marketplace', 'forum', 'loans', 'protections', 'pona', 'training', 'exports', 'user-market', 'cold-storage', 'rent-machines', 'pest-warnings', 'seed-bank', 'soil-test', 'livestock-health', 'fish-water-test', 'map-resources', 'knowledge-base', 'video-tutorials'].includes(activeTab) && (
+            <button
+              onClick={() => {
+                setIsAdding(true);
+                setEditingItem(null);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-[#4CAF50] text-white rounded-xl font-bold hover:bg-[#43A047] transition-all"
+            >
+              <Plus size={20} />
+              {t('add_new')}
+            </button>
+          )}
+        </div>
+
+        <div className="divide-y divide-[#E0E8E0]">
+          <AnimatePresence>
+            {(isAdding || editingItem) && ['species', 'diseases', 'products', 'market', 'calendar', 'marketplace', 'forum', 'loans', 'protections', 'pona', 'training', 'exports', 'user-market', 'cold-storage', 'rent-machines', 'pest-warnings', 'seed-bank', 'soil-test', 'livestock-health', 'fish-water-test', 'map-resources', 'knowledge-base', 'video-tutorials', 'settings'].includes(activeTab) && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden bg-[#F9FBF9]"
+              >
+                <div className="p-8">
+                  <div className="max-w-4xl mx-auto">
+                    <div className="flex items-center justify-between mb-8">
+                      <h3 className="text-2xl font-black text-[#1B301B] uppercase tracking-tight">
+                        {editingItem ? 'Edit' : 'Add New'} {getTabLabel(activeTab)}
+                      </h3>
+                      <button 
+                        onClick={() => {
+                          setIsAdding(false);
+                          setEditingItem(null);
+                        }}
+                        className="p-2 hover:bg-[#E0E8E0] rounded-full transition-colors"
+                      >
+                        <X size={24} />
+                      </button>
+                    </div>
+                    <Form 
+                      type={activeTab} 
+                      initialData={editingItem} 
+                      onSave={handleSave} 
+                      onCancel={() => {
+                        setIsAdding(false);
+                        setEditingItem(null);
+                      }}
+                      speciesList={species}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="divide-y divide-[#E0E8E0]">
+            {activeTab === 'species' && filterData(species).map(s => <ListItem key={s.id} item={s} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'diseases' && filterData(diseases).map(d => <ListItem key={d.id} item={d} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'products' && filterData(products).map(p => <ListItem key={p.id} item={p} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'market' && filterData(marketPrices).map(m => <ListItem key={m.id} item={m} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'calendar' && filterData(cropCalendar).map(c => <ListItem key={c.id} item={c} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'user-market' && filterData(userMarketPrices).map(m => <ListItem key={m.id} item={m} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'marketplace' && filterData(marketplace).map(m => <ListItem key={m.id} item={m} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'forum' && filterData(forumPosts).map(f => <ListItem key={f.id} item={f} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'cold-storage' && filterData(coldStorages).map(s => <ListItem key={s.id} item={s} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'rent-machines' && filterData(rentMachines).map(m => <ListItem key={m.id} item={m} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'pest-warnings' && filterData(pestWarnings).map(p => <ListItem key={p.id} item={p} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'seed-bank' && filterData(seedBank).map(s => <ListItem key={s.id} item={s} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'soil-test' && filterData(soilTests).map(s => <ListItem key={s.id} item={s} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'livestock-health' && filterData(livestockHealth).map(l => <ListItem key={l.id} item={l} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'fish-water-test' && filterData(fishWaterTests).map(f => <ListItem key={f.id} item={f} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'map-resources' && filterData(mapResources).map(m => <ListItem key={m.id} item={m} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'knowledge-base' && filterData(knowledgeBase).map(k => <ListItem key={k.id} item={k} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'video-tutorials' && filterData(videos).map(v => <ListItem key={v.id} item={v} onEdit={setEditingItem} onDelete={handleDelete} isAdmin={isAdmin || isManager} />)}
+            {activeTab === 'agents' && filterData(agentApps).map(a => (
+              <div key={a.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Users size={18} className="text-[#4CAF50]" />
+                    <h4 className="font-bold text-lg">{a.name} {a.agentId && <span className="text-[#4CAF50] ml-2">[{a.agentId}]</span>}</h4>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                      a.status === 'approved' ? "bg-green-100 text-green-700" : a.status === 'rejected' ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"
+                    )}>{a.status || 'pending'}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm text-[#556B55]">
+                    <p><strong>Shop:</strong> {a.shopName}</p>
+                    <p><strong>Type:</strong> {a.agentType}</p>
+                    <p><strong>Phone:</strong> {a.phone}</p>
+                    <p><strong>Location:</strong> {a.upazila}, {a.address}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {isAdmin && <button onClick={() => setEditingItem(a)} className="p-2 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-colors"><Edit2 size={18} /></button>}
+                  {isAdmin && a.status !== 'approved' && (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          placeholder="Agent ID" 
+                          id={`manual-id-${a.id}`}
+                          defaultValue={a.agentId || `KB-${Math.floor(1000 + Math.random() * 9999)}`}
+                          className="px-2 py-1 border rounded text-xs w-24"
+                        />
+                        <input 
+                          type="password" 
+                          placeholder="Password" 
+                          id={`password-${a.id}`}
+                          className="px-2 py-1 border rounded text-xs w-24"
+                        />
+                      </div>
+                      <button onClick={async () => {
+                        const manualId = (document.getElementById(`manual-id-${a.id}`) as HTMLInputElement)?.value;
+                        const password = (document.getElementById(`password-${a.id}`) as HTMLInputElement)?.value;
+                        
+                        if (!password) {
+                          alert("Please provide a password for the agent.");
+                          return;
+                        }
+
+                        const agentId = (manualId || `KB-${Math.floor(1000 + Math.random() * 9000)}`).toUpperCase();
+                        
+                        try {
+                          // 1. Update application status
+                          await updateDoc(doc(db, 'agentApplications', a.id), { 
+                            status: 'approved',
+                            agentId: agentId,
+                            approvalDate: serverTimestamp()
+                          });
+
+                          // 2. Create/Update login credentials in 'agents' collection
+                          const { setDoc, doc: fireDoc } = await import('firebase/firestore');
+                          await setDoc(fireDoc(db, 'agents', a.userId), {
+                            ...a,
+                            agentId: agentId,
+                            password: password,
+                            status: 'active',
+                            updatedAt: serverTimestamp()
+                          });
+
+                          alert(`Agent approved with ID: ${agentId}`);
+                        } catch (err) {
+                          handleFirestoreError(err, OperationType.WRITE, 'agents/agentApplications');
+                        }
+                      }} className="px-3 py-1 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 transition-all uppercase tracking-wider">Finalize Approval</button>
+                    </div>
+                  )}
+                  {isAdmin && <button onClick={() => handleDelete(a.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>}
+                </div>
+              </div>
+            ))}
+            {activeTab === 'cards' && filterData(cardApplications).map(a => (
+              <div key={a.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Shield size={18} className="text-[#4CAF50]" />
+                    <h4 className="font-bold text-lg">{a.name}</h4>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                      a.status === 'approved' ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"
+                    )}>{a.status || 'pending'}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm text-[#556B55]">
+                    <p><strong>Father:</strong> {a.fatherName}</p>
+                    <p><strong>NID:</strong> {a.nidNumber}</p>
+                    <p><strong>Phone:</strong> {a.phone}</p>
+                    <p><strong>Card Type:</strong> {a.cardType}</p>
+                    <p><strong>Referred By:</strong> {a.referredByAgentName ? `${a.referredByAgentName} [${a.referredByAgentId}]` : 'None'}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {isAdmin && <button onClick={() => setEditingItem(a)} className="p-2 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-colors"><Edit2 size={18} /></button>}
+                  {isAdmin && a.status !== 'approved' && (
+                    <button onClick={() => updateDoc(doc(db, 'cardApplications', a.id), { status: 'approved' })} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-all">Approve</button>
+                  )}
+                  {isAdmin && <button onClick={() => handleDelete(a.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>}
+                </div>
+              </div>
+            ))}
+            {activeTab === 'users' && filterData(users).map(u => <UserItem key={u.id} user={u} onUpdateRole={(role: string) => updateDoc(doc(db, 'users', u.id), { role })} isAdmin={isAdmin} />)}
+            
+            {activeTab === 'settings' && isAdmin && (
+              <div className="p-6 space-y-8">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-2xl font-black text-[#1B301B] uppercase tracking-tight">Admin & Rule Management</h3>
+                    <p className="text-sm text-[#556B55]">Create and manage system administrators</p>
+                  </div>
+                  {isSuperAdmin && (
+                    <button 
+                      onClick={() => {
+                        setEditingItem(null);
+                        setIsAdding(true);
+                        setActiveTab('settings');
+                      }}
+                      className="flex items-center gap-2 px-6 py-3 bg-organic-dark text-white rounded-full font-bold shadow-lg hover:-translate-y-1 transition-all"
+                    >
+                      <Plus size={20} />
+                      Add New Admin
+                    </button>
+                  )}
+                </div>
+
+                <div className="bg-white rounded-3xl border border-[#E0E8E0] overflow-hidden shadow-sm">
+                  <div className="p-4 bg-[#F9FBF9] border-b border-[#E0E8E0] grid grid-cols-4 font-bold text-sm text-[#556B55]">
+                    <span>Name</span>
+                    <span>Credentials</span>
+                    <span>Role</span>
+                    <span className="text-right">Actions</span>
+                  </div>
+                  <div className="divide-y divide-[#E0E8E0]">
+                    {filterData(users.filter(u => u.role === 'admin' || u.role === 'manager')).map(u => (
+                      <div key={u.id} className="p-4 grid grid-cols-4 items-center text-sm hover:bg-[#F9FBF9] transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-organic-green/10 rounded-full flex items-center justify-center text-organic-green font-black">
+                            {u.name?.charAt(0) || 'A'}
+                          </div>
+                          <span className="font-bold">{u.name}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[#8BA88B] truncate pr-4">{u.email || u.phone}</span>
+                          {u.password && (
+                            <div className="flex items-center gap-1 text-[9px] text-emerald-600 font-black tracking-widest mt-0.5">
+                              <Lock size={8} /> {u.password}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <span className={cn(
+                            "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                            u.role === 'admin' ? "bg-purple-100 text-purple-600 shadow-sm" : 
+                            "bg-blue-100 text-blue-600 shadow-sm"
+                          )}>
+                            {u.role}
+                          </span>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          {isSuperAdmin ? (
+                            <>
+                              <button 
+                                onClick={() => setEditingItem(u)}
+                                className="p-2 text-organic-green hover:bg-organic-green/10 rounded-lg transition-all"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button 
+                                onClick={() => handleDelete(u.id)}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-[10px] uppercase font-bold text-gray-300">Protected</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-8 border-t border-[#E0E8E0]">
+                  <h3 className="text-xl font-bold mb-4">All User Access</h3>
+                  <div className="bg-white rounded-3xl border border-[#E0E8E0] overflow-hidden shadow-sm">
+                    <div className="p-4 bg-[#F9FBF9] border-b border-[#E0E8E0] grid grid-cols-4 font-bold text-sm text-[#556B55]">
+                      <span>User</span>
+                      <span>Identifier</span>
+                      <span>Current Access</span>
+                      <span className="text-right">Update Role</span>
+                    </div>
+                    <div className="divide-y divide-[#E0E8E0]">
+                      {filterData(users.filter(u => u.role !== 'admin' && u.role !== 'manager')).map(u => (
+                        <div key={u.id} className="p-4 grid grid-cols-4 items-center text-sm hover:bg-[#F9FBF9] transition-colors">
+                          <span className="font-bold">{u.name}</span>
+                          <span className="text-[#8BA88B]">{u.email || u.phone}</span>
+                          <span className="text-gray-400 capitalize">{u.role || 'user'}</span>
+                          <div className="flex justify-end pr-1">
+                            {isSuperAdmin ? (
+                              <select 
+                                value={u.role || 'user'} 
+                                onChange={(e) => updateDoc(doc(db, 'users', u.id), { role: e.target.value })}
+                                className="px-3 py-1.5 bg-[#FDFCFB] border border-[#E0E8E0] rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-organic-green transition-all"
+                              >
+                                <option value="user">Standard User</option>
+                                <option value="manager">Manager Access</option>
+                                <option value="admin">Admin Root</option>
+                              </select>
+                            ) : (
+                              <span className="text-[10px] uppercase font-bold text-gray-300">View Only</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            {activeTab === 'stories' && filterData(stories).map(story => (
+              <div key={story.id} className="p-6 hover:bg-[#F9FBF9] transition-colors">
+                <div className="flex justify-between items-start">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-lg">{story.userName}</h4>
+                      <span className="text-xs text-[#8BA88B]">{story.createdAt?.toDate ? story.createdAt.toDate().toLocaleString() : new Date(story.createdAt).toLocaleString()}</span>
+                    </div>
+                    <p className="text-[#556B55]">{story.content}</p>
+                  </div>
+                  {isAdmin && (
+                    <div className="flex gap-2">
+                      <button onClick={() => setEditingItem(story)} className="p-2 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-all">
+                        <Edit2 size={18} />
+                      </button>
+                      <button onClick={() => handleDelete(story.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {activeTab === 'problems' && filterData(problems).map(problem => (
+              <div key={problem.id} className="p-6 hover:bg-[#F9FBF9] transition-colors">
+                <div className="flex justify-between items-start">
+                  <div className="space-y-4 flex-1">
+                    <div className="flex items-center gap-2">
+                      <Activity size={18} className="text-[#4CAF50]" />
+                      <h4 className="font-bold text-lg">Problem Log</h4>
+                      <span className="text-xs text-[#8BA88B]">{problem.timestamp?.toDate ? problem.timestamp.toDate().toLocaleString() : new Date(problem.timestamp).toLocaleString()}</span>
+                    </div>
+                    <div className="bg-red-50 p-4 rounded-2xl border border-red-100">
+                      <p className="text-xs font-bold text-red-600 uppercase mb-1">Problem</p>
+                      <p className="text-[#1B301B]">{problem.problem}</p>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-2xl border border-green-100">
+                      <p className="text-xs font-bold text-[#4CAF50] uppercase mb-1">AI Solution</p>
+                      <p className="text-[#1B301B]">{problem.solution}</p>
+                    </div>
+                  </div>
+                  {isAdmin && (
+                    <div className="flex gap-2">
+                      <button onClick={() => setEditingItem(problem)} className="p-2 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-all">
+                        <Edit2 size={18} />
+                      </button>
+                      <button onClick={() => handleDelete(problem.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {activeTab === 'loans' && filterData(loans).map(loan => (
+              <div key={loan.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Landmark size={18} className="text-[#4CAF50]" />
+                    <h4 className="font-bold text-lg">{loan.name || loan.userName}</h4>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                      loan.status === 'approved' ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                    )}>{loan.status}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm text-[#556B55]">
+                    <p><strong>Loan ID:</strong> <span className="font-black">{loan.loanId || 'N/A'}</span></p>
+                    <p><strong>Amount:</strong> {loan.amount} TK</p>
+                    <p><strong>Phone:</strong> {loan.phone}</p>
+                    <p><strong>Location:</strong> {loan.upazila}, {loan.district}</p>
+                    <p className="col-span-2 text-xs bg-emerald-50 p-1 rounded"><strong>Referred By:</strong> {loan.referredByAgentName ? `${loan.referredByAgentName} [${loan.referredByAgentId}]` : 'None'}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {isAdmin && (
+                    <button 
+                      onClick={() => {
+                        setEditingItem({ 
+                          loanId: loan.loanId, 
+                          agentId: loan.referredByAgentId || null,
+                          userName: loan.name || loan.userName,
+                          date: new Date().toISOString().split('T')[0], 
+                          amount: '' 
+                        });
+                        setActiveTab('loan-payments');
+                        setIsAdding(true);
+                      }} 
+                      className="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold hover:bg-purple-100 transition-all"
+                    >
+                      + Entry
+                    </button>
+                  )}
+                  {isAdmin && <button onClick={() => setEditingItem(loan)} className="p-2 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-colors"><Edit2 size={18} /></button>}
+                  {isAdmin && loan.status !== 'approved' && <button onClick={() => updateDoc(doc(db, 'loanApplications', loan.id), { status: 'approved', approvalDate: serverTimestamp() })} className="px-3 py-1 bg-green-50 text-green-600 rounded-lg text-xs font-bold hover:bg-green-100 transition-all">Approve</button>}
+                  {isAdmin && <button onClick={() => handleDelete(loan.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>}
+                </div>
+              </div>
+            ))}
+
+            {activeTab === 'loan-payments' && filterData(loanPayments).map(pay => (
+              <div key={pay.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4 border-l-4 border-l-[#4CAF50]">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <HistoryIcon size={18} className="text-[#4CAF50]" />
+                    <h4 className="font-bold text-lg">Installment Paid</h4>
+                    <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase">{pay.item || 'Loan Payment'}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm text-[#556B55]">
+                    <p><strong>Loan ID:</strong> {pay.loanId}</p>
+                    <p><strong>Amount:</strong> {pay.amount} TK</p>
+                    <p><strong>Date:</strong> {pay.date}</p>
+                    <p><strong>Method:</strong> {pay.method}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {isAdmin && <button onClick={() => handleDelete(pay.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>}
+                </div>
+              </div>
+            ))}
+
+            {activeTab === 'protections' && filterData(protections).map(p => (
+              <div key={p.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Shield size={18} className="text-[#4CAF50]" />
+                    <h4 className="font-bold text-lg">{p.name || p.userName}</h4>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                      p.status === 'approved' ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
+                    )}>{p.status}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm text-[#556B55]">
+                    <p><strong>Protection ID:</strong> <span className="font-black">{p.protectionId || 'N/A'}</span></p>
+                    <p><strong>Crop:</strong> {p.cropType}</p>
+                    <p><strong>Total Value:</strong> {p.totalValue} TK</p>
+                    <p><strong>Phone:</strong> {p.phone}</p>
+                    <p className="col-span-2 text-xs bg-emerald-50 p-1 rounded"><strong>Referred By:</strong> {p.referredByAgentName ? `${p.referredByAgentName} [${p.referredByAgentId}]` : 'None'}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {isAdmin && <button onClick={() => setEditingItem(p)} className="p-2 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-colors"><Edit2 size={18} /></button>}
+                  {isAdmin && p.status !== 'approved' && <button onClick={() => updateDoc(doc(db, 'protectionApplications', p.id), { status: 'approved', approvalDate: serverTimestamp() })} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-all">Approve</button>}
+                  {isAdmin && <button onClick={() => handleDelete(p.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>}
+                </div>
+              </div>
+            ))}
+
+            {activeTab === 'protection-updates' && filterData(protectionUpdates).map(upd => (
+              <div key={upd.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center gap-6">
+                <div className="w-24 h-24 bg-gray-100 rounded-2xl overflow-hidden shadow-sm shrink-0 border border-white">
+                  <img src={upd.updatePic} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                </div>
+                <div className="space-y-2 flex-1">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw size={18} className="text-[#4CAF50]" />
+                    <h4 className="font-bold text-lg">{upd.userName}</h4>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold uppercase">{upd.cropType}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-xs text-[#556B55]">
+                    <p><strong>ID:</strong> {upd.protectionId}</p>
+                    <p><strong>Date:</strong> {upd.date}</p>
+                    <p className="col-span-2"><strong>Details:</strong> {upd.details}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                   {isAdmin && <button onClick={() => handleDelete(upd.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>}
+                </div>
+              </div>
+            ))}
+
+            {activeTab === 'pona' && filterData(ponaOrders).map(o => (
+              <div key={o.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <ShoppingBag size={18} className="text-[#4CAF50]" />
+                    <h4 className="font-bold text-lg">{o.userName}</h4>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                      o.status === 'completed' ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
+                    )}>{o.status}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm text-[#556B55]">
+                    <p><strong>Category:</strong> {o.category}</p>
+                    <p><strong>Phone:</strong> {o.phone}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {isAdmin && <button onClick={() => setEditingItem(o)} className="p-2 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-colors"><Edit2 size={18} /></button>}
+                  {isAdmin && <button onClick={() => updateDoc(doc(db, 'ponaOrders', o.id), { status: 'completed' })} className="px-3 py-1 bg-green-50 text-green-600 rounded-lg text-xs font-bold hover:bg-green-100 transition-all">Complete</button>}
+                  {isAdmin && <button onClick={() => handleDelete(o.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>}
+                </div>
+              </div>
+            ))}
+
+            {activeTab === 'training' && filterData(trainingApps).map(a => (
+              <div key={a.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <GraduationCap size={18} className="text-[#4CAF50]" />
+                    <h4 className="font-bold text-lg">{a.userName}</h4>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                      a.status === 'approved' ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"
+                    )}>{a.status}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm text-[#556B55]">
+                    <p><strong>Topic:</strong> {a.trainingType}</p>
+                    <p><strong>Fee:</strong> {a.feeType}</p>
+                    <p><strong>Phone:</strong> {a.phone}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {isAdmin && <button onClick={() => setEditingItem(a)} className="p-2 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-colors"><Edit2 size={18} /></button>}
+                  {isAdmin && <button onClick={() => updateDoc(doc(db, 'trainingApplications', a.id), { status: 'approved' })} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-all">Approve</button>}
+                  {isAdmin && <button onClick={() => handleDelete(a.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>}
+                </div>
+              </div>
+            ))}
+
+            {activeTab === 'exports' && filterData(exportApps).map(a => (
+              <div key={a.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Globe size={18} className="text-[#4CAF50]" />
+                    <h4 className="font-bold text-lg">{a.name}</h4>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                      a.status === 'approved' ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"
+                    )}>{a.status}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm text-[#556B55]">
+                    <p><strong>Product:</strong> {a.productName}</p>
+                    <p><strong>District:</strong> {a.district}</p>
+                    <p><strong>Phone:</strong> {a.phone}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {isAdmin && <button onClick={() => setEditingItem(a)} className="p-2 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-colors"><Edit2 size={18} /></button>}
+                  {isAdmin && <button onClick={() => updateDoc(doc(db, 'exportApplications', a.id), { status: 'approved' })} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-all">Approve</button>}
+                  {isAdmin && <button onClick={() => handleDelete(a.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+}
+

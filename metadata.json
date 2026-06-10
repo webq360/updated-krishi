@@ -1,0 +1,6 @@
+{
+  "name": "Krishi Bondhu",
+  "description": "A comprehensive AgriTech application for Bangladeshi farmers with AI-powered problem solving, livestock and fisheries encyclopedia, and ABS Feed product integration.",
+  "requestFramePermissions": ["microphone", "camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

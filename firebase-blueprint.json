@@ -1,0 +1,484 @@
+{
+  "entities": {
+    "Species": {
+      "title": "Species",
+      "description": "A specific animal or fish species for farming.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the species (e.g., Cow, Pangaas)" },
+        "category": { "type": "string", "enum": ["livestock", "poultry", "fisheries"], "description": "Main category" },
+        "description": { "type": "string", "description": "General description" },
+        "farmingMethod": { "type": "string", "description": "Detailed farming methods" },
+        "stockingDensity": { "type": "string", "description": "Mujud Ghonotto" },
+        "biosecurity": { "type": "string", "description": "Biosecurity protocols" },
+        "imageUrl": { "type": "string", "description": "Image URL for the species" }
+      },
+      "required": ["name", "category"]
+    },
+    "Disease": {
+      "title": "Disease",
+      "description": "Information about a common disease affecting a species.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Name of the disease" },
+        "speciesId": { "type": "string", "description": "Reference to the affected species" },
+        "description": { "type": "string", "description": "Description of the disease" },
+        "symptoms": { "type": "string", "description": "Common symptoms" },
+        "treatment": { "type": "string", "description": "Recommended treatments" }
+      },
+      "required": ["title", "speciesId"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "ABS Feed product information.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Product name" },
+        "description": { "type": "string", "description": "Product description" },
+        "benefits": { "type": "string", "description": "Benefits of the product" },
+        "imageUrl": { "type": "string", "description": "Product image URL" },
+        "orderLink": { "type": "string", "description": "Link to order the product" }
+      },
+      "required": ["name"]
+    },
+    "ProblemLog": {
+      "title": "ProblemLog",
+      "description": "Log of user problems and AI solutions.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the user" },
+        "problem": { "type": "string", "description": "The problem described by the farmer" },
+        "solution": { "type": "string", "description": "The solution provided by Gemini AI" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the problem was logged" }
+      },
+      "required": ["userId", "problem", "solution", "timestamp"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Registered farmer profile.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name of the farmer" },
+        "address": { "type": "string", "description": "Physical address" },
+        "phone": { "type": "string", "description": "Phone number (Required)" },
+        "email": { "type": "string", "format": "email", "description": "Email address (Optional)" },
+        "role": { "type": "string", "enum": ["user", "manager", "admin"], "description": "User role" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Registration date" }
+      },
+      "required": ["name", "phone", "role", "createdAt"]
+    },
+    "OnlineUser": {
+      "title": "OnlineUser",
+      "description": "Tracking currently online users.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the online user" },
+        "lastSeen": { "type": "string", "format": "date-time", "description": "Last activity timestamp" }
+      },
+      "required": ["userId", "lastSeen"]
+    },
+    "Story": {
+      "title": "Story",
+      "description": "A farming story posted by a user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the author" },
+        "userName": { "type": "string", "description": "Name of the author" },
+        "content": { "type": "string", "description": "Story text" },
+        "imageUrl": { "type": "string", "description": "Optional image URL (compressed)" },
+        "likesCount": { "type": "number", "description": "Number of reactions" },
+        "commentsCount": { "type": "number", "description": "Number of comments" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Post timestamp" }
+      },
+      "required": ["userId", "userName", "content", "createdAt"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "A comment on a story.",
+      "type": "object",
+      "properties": {
+        "storyId": { "type": "string", "description": "ID of the parent story" },
+        "userId": { "type": "string", "description": "UID of the commenter" },
+        "userName": { "type": "string", "description": "Name of the commenter" },
+        "content": { "type": "string", "description": "Comment text" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Comment timestamp" }
+      },
+      "required": ["storyId", "userId", "userName", "content", "createdAt"]
+    },
+    "Reaction": {
+      "title": "Reaction",
+      "description": "A reaction (like) on a story.",
+      "type": "object",
+      "properties": {
+        "storyId": { "type": "string", "description": "ID of the parent story" },
+        "userId": { "type": "string", "description": "UID of the user who reacted" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Reaction timestamp" }
+      },
+      "required": ["storyId", "userId", "timestamp"]
+    },
+    "MarketPrice": {
+      "title": "MarketPrice",
+      "description": "Daily market price of agricultural products.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the product" },
+        "price": { "type": "string", "description": "Price range (e.g., 68-72)" },
+        "unit": { "type": "string", "description": "Unit (e.g., kg, maund, dozen)" },
+        "change": { "type": "string", "enum": ["up", "down", "stable"], "description": "Price trend direction" },
+        "trend": { "type": "string", "description": "Trend percentage (e.g., +2.5%)" },
+        "district": { "type": "string", "description": "District name" },
+        "category": { "type": "string", "enum": ["Crops", "Fish", "Poultry"], "description": "Product category" }
+      },
+      "required": ["name", "price", "unit", "district", "category"]
+    },
+    "CropCalendar": {
+      "title": "CropCalendar",
+      "description": "Seasonal crop guide and tasks.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the crop" },
+        "season": { "type": "string", "description": "Cultivation season (e.g., July - December)" },
+        "stage": { "type": "string", "description": "Current growth stage" },
+        "tasks": { "type": "array", "items": { "type": "string" }, "description": "List of recommended tasks" },
+        "color": { "type": "string", "description": "Tailwind color class for UI" },
+        "guide": {
+          "type": "object",
+          "properties": {
+            "en": { "type": "string", "description": "English guide text" },
+            "bn": { "type": "string", "description": "Bengali guide text" }
+          }
+        }
+      },
+      "required": ["name", "season", "stage", "tasks", "guide"]
+    },
+    "PonaOrder": {
+      "title": "PonaOrder",
+      "description": "Seedling purchase order from a farmer.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the user" },
+        "userName": { "type": "string", "description": "Name of the user" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "category": { "type": "string", "enum": ["Fish", "Poultry Chicks", "Calves", "Shrimp"], "description": "Category of seedling" },
+        "details": { "type": "string", "description": "Specific details or quantity" },
+        "status": { "type": "string", "enum": ["pending", "contacted", "completed"], "description": "Order status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Order timestamp" }
+      },
+      "required": ["userId", "userName", "phone", "category", "createdAt"]
+    },
+    "TrainingApplication": {
+      "title": "TrainingApplication",
+      "description": "Application for agricultural training.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the user" },
+        "userName": { "type": "string", "description": "Name of the user" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "trainingType": { "type": "string", "description": "Topic of training (e.g., Fish Farming, Poultry)" },
+        "feeType": { "type": "string", "enum": ["free", "paid"], "description": "Type of fee" },
+        "status": { "type": "string", "enum": ["pending", "approved", "completed"], "description": "Application status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Application timestamp" }
+      },
+      "required": ["userId", "userName", "phone", "trainingType", "createdAt"]
+    },
+    "LoanApplication": {
+      "title": "LoanApplication",
+      "description": "Application for agricultural loan.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the user" },
+        "userName": { "type": "string", "description": "Name of the user" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "loanAmount": { "type": "string", "description": "Requested loan amount" },
+        "purpose": { "type": "string", "description": "Purpose of the loan" },
+        "agentId": { "type": "string", "description": "Reference ID of the agent" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "description": "Application status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Application timestamp" }
+      },
+      "required": ["userId", "userName", "phone", "loanAmount", "createdAt"]
+    },
+    "ProtectionApplication": {
+      "title": "ProtectionApplication",
+      "description": "Application for crop/livestock protection assistance.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the user" },
+        "userName": { "type": "string", "description": "Name of the user" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "issueType": { "type": "string", "description": "Type of protection needed" },
+        "details": { "type": "string", "description": "Details of the issue" },
+        "agentId": { "type": "string", "description": "Reference ID of the agent" },
+        "status": { "type": "string", "enum": ["pending", "investigating", "resolved"], "description": "Application status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Application timestamp" }
+      },
+      "required": ["userId", "userName", "phone", "issueType", "createdAt"]
+    },
+    "Agent": {
+      "title": "Agent",
+      "description": "Authorized Krishi Bondhu Agent.",
+      "type": "object",
+      "properties": {
+        "agentId": { "type": "string", "description": "Unique Agent ID (assigned by admin)" },
+        "password": { "type": "string", "description": "Login password" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "shopName": { "type": "string" },
+        "shopAddress": { "type": "string" },
+        "district": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "userId": { "type": "string", "description": "The UID of the user who is the agent" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["agentId", "password", "name", "status"]
+    },
+    "ProtectionUpdate": {
+      "title": "ProtectionUpdate",
+      "description": "Progress update on a protection application with photo.",
+      "type": "object",
+      "properties": {
+        "applicationId": { "type": "string" },
+        "agentId": { "type": "string" },
+        "content": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["applicationId", "agentId", "content", "timestamp"]
+    },
+    "Installment": {
+      "title": "Installment",
+      "description": "Installment record for a farmer's application.",
+      "type": "object",
+      "properties": {
+        "applicationId": { "type": "string" },
+        "farmerName": { "type": "string" },
+        "amount": { "type": "number" },
+        "dueDate": { "type": "string", "format": "date" },
+        "paidDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["upcoming", "paid", "overdue"] },
+        "agentId": { "type": "string" }
+      },
+      "required": ["applicationId", "amount", "dueDate", "status"]
+    },
+    "UserMarketPrice": {
+      "title": "UserMarketPrice",
+      "description": "Market price posted by a user for their area.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the user" },
+        "userName": { "type": "string", "description": "Name of the user" },
+        "productName": { "type": "string", "description": "Name of the product" },
+        "price": { "type": "string", "description": "Price" },
+        "unit": { "type": "string", "description": "Unit" },
+        "area": { "type": "string", "description": "Area/Market name" },
+        "date": { "type": "string", "format": "date", "description": "Date of the price" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Post timestamp" }
+      },
+      "required": ["userId", "userName", "productName", "price", "unit", "area", "date", "createdAt"]
+    },
+    "ExportApplication": {
+      "title": "ExportApplication",
+      "description": "Application for exporting surplus crops.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the user" },
+        "name": { "type": "string", "description": "Name of the farmer" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "district": { "type": "string", "description": "District" },
+        "upazila": { "type": "string", "description": "Upazila" },
+        "productName": { "type": "string", "description": "Product name" },
+        "details": { "type": "string", "description": "Details about the surplus" },
+        "status": { "type": "string", "enum": ["pending", "reviewed", "contacted"], "description": "Status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Application timestamp" }
+      },
+      "required": ["userId", "name", "phone", "district", "upazila", "productName", "createdAt"]
+    },
+    "ColdStorage": {
+      "title": "ColdStorage",
+      "description": "Information about cold storage facilities.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "phone": { "type": "string" },
+        "capacity": { "type": "string" },
+        "availableSpace": { "type": "string" },
+        "district": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "location", "phone", "district"]
+    },
+    "RentMachine": {
+      "title": "RentMachine",
+      "description": "Agricultural machinery available for rent.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "machineName": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "phone": { "type": "string" },
+        "rate": { "type": "string" },
+        "district": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["machineName", "ownerName", "phone", "rate", "district"]
+    },
+    "CardApplication": {
+      "title": "CardApplication",
+      "description": "Application for Krishi Bondhu Digital Card.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "nid": { "type": "string" },
+        "landSize": { "type": "string" },
+        "district": { "type": "string" },
+        "upazila": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "phone", "nid", "landSize", "district", "upazila"]
+    },
+    "PestWarning": {
+      "title": "PestWarning",
+      "description": "Alerts for pests or diseases in specific areas.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "area": { "type": "string" },
+        "severity": { "type": "string", "enum": ["low", "medium", "high"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "area", "severity"]
+    },
+    "SeedBank": {
+      "title": "SeedBank",
+      "description": "Information about seeds for exchange or sale.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "seedName": { "type": "string" },
+        "variety": { "type": "string" },
+        "quantity": { "type": "string" },
+        "district": { "type": "string" },
+        "contact": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["seedName", "variety", "district", "contact"]
+    },
+    "LedgerEntry": {
+      "title": "LedgerEntry",
+      "description": "Income or expense record for a farmer.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "amount": { "type": "number" },
+        "category": { "type": "string", "description": "e.g., Seeds, Fertilizer, Labor, Sales" },
+        "date": { "type": "string", "format": "date" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "amount", "category", "date"]
+    },
+    "MapResource": {
+      "title": "MapResource",
+      "description": "Physical resource location (Cold Storage, Dealer, etc.)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["storage", "rental", "dealer", "agent"] },
+        "address": { "type": "string" },
+        "district": { "type": "string" },
+        "phone": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "type", "address", "district", "latitude", "longitude"]
+    },
+    "KnowledgeBase": {
+      "title": "KnowledgeBase",
+      "description": "Educational guide for offline reading.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "content": { "type": "string" },
+        "iconName": { "type": "string", "description": "Lucide icon name" },
+        "order": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "category", "content"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System alerts or personal notifications.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of recipient or 'all' for broadcase" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "warning", "weather", "success"] },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "body", "type", "read", "createdAt"]
+    },
+    "Video": {
+      "title": "Video",
+      "description": "Educational video tutorial.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "titleBn": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "duration": { "type": "string" },
+        "views": { "type": "string" },
+        "category": { "type": "string" },
+        "categoryBn": { "type": "string" },
+        "url": { "type": "string" },
+        "channel": { "type": "string" },
+        "publishedAt": { "type": "string" },
+        "publishedAtBn": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "titleBn", "url", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/species/{speciesId}": { "schema": "Species", "description": "Collection of species data" },
+    "/diseases/{diseaseId}": { "schema": "Disease", "description": "Collection of disease data" },
+    "/products/{productId}": { "schema": "Product", "description": "Collection of ABS Feed products" },
+    "/problemLogs/{logId}": { "schema": "ProblemLog", "description": "Collection of AI interaction logs" },
+    "/users/{userId}": { "schema": "User", "description": "Collection of registered user profiles" },
+    "/onlineUsers/{userId}": { "schema": "OnlineUser", "description": "Collection for tracking online status" },
+    "/stories/{storyId}": { "schema": "Story", "description": "Collection of farming stories" },
+    "/stories/{storyId}/comments/{commentId}": { "schema": "Comment", "description": "Subcollection of comments on a story" },
+    "/stories/{storyId}/reactions/{userId}": { "schema": "Reaction", "description": "Subcollection of reactions on a story" },
+    "/marketPrices/{priceId}": { "schema": "MarketPrice", "description": "Collection of daily market prices" },
+    "/cropCalendar/{cropId}": { "schema": "CropCalendar", "description": "Collection of seasonal crop guides" },
+    "/ponaOrders/{orderId}": { "schema": "PonaOrder", "description": "Collection of seedling purchase orders" },
+    "/trainingApplications/{appId}": { "schema": "TrainingApplication", "description": "Collection of training applications" },
+    "/loanApplications/{appId}": { "schema": "LoanApplication", "description": "Collection of loan applications" },
+    "/protectionApplications/{appId}": { "schema": "ProtectionApplication", "description": "Collection of protection applications" },
+    "/userMarketPrices/{priceId}": { "schema": "UserMarketPrice", "description": "Collection of user-posted market prices" },
+    "/exportApplications/{appId}": { "schema": "ExportApplication", "description": "Collection of export applications" },
+    "/coldStorage/{storageId}": { "schema": "ColdStorage", "description": "Collection of cold storage facilities" },
+    "/rentMachines/{machineId}": { "schema": "RentMachine", "description": "Collection of machinery for rent" },
+    "/cardApplications/{appId}": { "schema": "CardApplication", "description": "Collection of digital card applications" },
+    "/pestWarnings/{warningId}": { "schema": "PestWarning", "description": "Collection of pest alerts" },
+    "/seedBank/{seedId}": { "schema": "SeedBank", "description": "Collection of seed exchange info" },
+    "/notifications/{notifId}": { "schema": "Notification", "description": "Collection of system alerts" },
+    "/farmingLedger/{entryId}": { "schema": "LedgerEntry", "description": "Farmer's income/expense logs" },
+    "/mapResources/{resourceId}": { "schema": "MapResource", "description": "Locations for interactive map" },
+    "/knowledgeBase/{articleId}": { "schema": "KnowledgeBase", "description": "Offline-ready agricultural guides" },
+    "/agents/{agentId}": { "schema": "Agent", "description": "Collection of authorized agents" },
+    "/protectionUpdates/{updateId}": { "schema": "ProtectionUpdate", "description": "Agent updates on protection cases" },
+    "/installments/{instId}": { "schema": "Installment", "description": "Payment installment records" },
+    "/videos/{videoId}": { "schema": "Video", "description": "Collection of video tutorials" }
+  }
+}

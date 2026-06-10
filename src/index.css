@@ -1,0 +1,181 @@
+@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+@import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-bn: "Hind Siliguri", sans-serif;
+  
+  --color-organic-green: #2ecc71;
+  --color-organic-dark: #1e3a1e;
+  --color-organic-light: #F5F8F5;
+  --color-organic-accent: #FFC107;
+
+  /* Dark Mode Overrides */
+  --color-dark-bg: #0A0F0A;
+  --color-dark-surface: #141C14;
+  --color-dark-border: #222C22;
+  --color-dark-text-main: #E2E8E2;
+  --color-dark-text-muted: #8FA58F;
+}
+
+/* Explicitly define dark mode selector strategy for v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+    transition: background-color 0.5s ease;
+  }
+  
+  body {
+    @apply antialiased text-organic-dark bg-[#FDFCFB] dark:bg-dark-bg dark:text-dark-text-main;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    transition: background-color 0.5s ease, color 0.5s ease;
+  }
+
+  /* Force Hind Siliguri for Bengali text and specific elements */
+  [lang="bn"], .font-bn {
+    font-family: "Hind Siliguri", sans-serif;
+    font-feature-settings: "kern", "liga", "clig";
+  }
+}
+
+@layer components {
+  .organic-card {
+    @apply bg-white dark:bg-dark-surface rounded-[32px] border border-[#E8EEE8] dark:border-dark-border shadow-[0_4px_20px_rgba(0,0,0,0.03)] transition-all duration-300;
+  }
+  
+  .organic-card:hover {
+    @apply shadow-[0_8px_30px_rgba(0,0,0,0.06)] -translate-y-1 border-organic-green/20 dark:border-organic-green/40;
+  }
+
+  .organic-btn {
+    @apply relative overflow-hidden px-8 py-4 rounded-full font-bold transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .organic-input {
+    @apply w-full px-6 py-4 bg-organic-light dark:bg-dark-surface/50 border border-[#E8EEE8] dark:border-dark-border rounded-full focus:bg-white dark:focus:bg-dark-surface focus:border-organic-green focus:ring-4 focus:ring-organic-green/10 outline-none transition-all text-organic-dark dark:text-gray-100 placeholder:text-gray-400;
+  }
+
+  .glass-morph {
+    @apply bg-white/70 dark:bg-dark-bg/70 backdrop-blur-xl border border-white/20 dark:border-white/10;
+  }
+
+  .premium-gradient {
+    background: linear-gradient(135deg, #1B301B 0%, #2D4A2D 100%);
+  }
+
+  .organic-gradient {
+    background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);
+  }
+
+  .shimmer-btn {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shimmer-btn::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+      45deg,
+      transparent,
+      rgba(255, 255, 255, 0.1),
+      transparent
+    );
+    transform: rotate(45deg);
+    animation: shimmer 3s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { transform: translate(-100%, -100%) rotate(45deg); }
+    100% { transform: translate(100%, 100%) rotate(45deg); }
+  }
+
+  .module-card {
+    @apply relative overflow-hidden bg-white dark:bg-dark-surface rounded-[2.5rem] border border-organic-green/5 dark:border-white/5 shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-500;
+  }
+
+  .text-glow {
+    text-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #FDFCFB;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E8EEE8;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4CAF50;
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 12s linear infinite;
+}
+
+.stagger-items > * {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: slideUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.stagger-items > *:nth-child(1) { animation-delay: 0.1s; }
+.stagger-items > *:nth-child(2) { animation-delay: 0.2s; }
+.stagger-items > *:nth-child(3) { animation-delay: 0.3s; }
+.stagger-items > *:nth-child(4) { animation-delay: 0.4s; }
+.stagger-items > *:nth-child(5) { animation-delay: 0.5s; }
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes slideUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}

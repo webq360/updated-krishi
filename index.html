@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KRISHI BONDHU | ABS FEED industries limited</title>
+    <meta name="theme-color" content="#2ecc71" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Krishi Bondhu" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="manifest" href="/manifest.json" />
+  </head>
+  <body>
+    <div id="initial-loader" style="position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; font-family: sans-serif; color: #2E7D32; font-size: 16px; text-align: center; flex-direction: column; gap: 15px; background: #FDFCFB; transition: opacity 0.5s ease;">
+      <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 140px; height: 140px; border-radius: 40px; overflow: hidden; background: #2E7D32;">
+        <img src="/logo.png" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="Krishi Bondhu Logo" />
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 15px; width: 100%; max-width: 400px;">
+        <div style="font-weight: 900; text-transform: uppercase; letter-spacing: -2px; font-size: 48px; color: #333333; line-height: 0.9;">কৃষি বন্ধু</div>
+        <div style="display: flex; align-items: center; justify-content: center; width: 100%;">
+          <div style="font-weight: 900; text-transform: uppercase; letter-spacing: 3px; font-size: 11px; color: #2E7D32; white-space: nowrap;">কৃষকের প্রকৃত বন্ধু</div>
+        </div>
+      </div>
+      <div style="margin-top: 15px;">
+        <div id="loading-status" style="font-size: 8px; opacity: 0.4; text-transform: uppercase; letter-spacing: 3px; font-weight: 900;">সংযোগ হচ্ছে...</div>
+      </div>
+      <div id="emergency-link" style="margin-top: 30px; display: none;">
+        <button onclick="location.reload()" style="background: #22c55e; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">পুনরায় লোড করুন (Retry)</button>
+      </div>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      console.log("Index.html: script started");
+      const statusEl = document.getElementById('loading-status');
+      const emergencyEl = document.getElementById('emergency-link');
+      const loaderEl = document.getElementById('initial-loader');
+
+      function safeHideLoader() {
+        if (loaderEl) {
+          loaderEl.style.opacity = '0';
+          setTimeout(() => { if (loaderEl.parentNode) loaderEl.parentNode.removeChild(loaderEl); }, 600);
+        }
+      }
+      
+      window.onerror = function(msg, url, line, col, error) {
+        console.error("GLOBAL ERROR", msg, url, line, col, error);
+        safeHideLoader(); // Hide loader so error is visible
+        const root = document.getElementById('root');
+        if (root) {
+          root.innerHTML = '<div style="padding: 40px; color: #9b1c1c; background: #fdf2f2; border: 1px solid #f8d7da; border-radius: 8px; font-family: sans-serif; margin: 20px;">' +
+            '<h2 style="margin-top:0">App Critical Error</h2>' +
+            '<p>' + msg + '</p>' +
+            '<small>' + url + ':' + line + ':' + col + '</small>' +
+            '<div style="margin-top: 20px"><button onclick="location.reload()" style="padding: 10px 20px; background: #9b1c1c; color: white; border: none; border-radius: 4px; cursor: pointer;">Reload</button></div>' +
+            '</div>';
+        }
+      };
+
+      setTimeout(() => {
+        if (!window.appStarted && statusEl) {
+          statusEl.innerText = "KB: একটু অপেক্ষা করুন... (Wait More)";
+          if (emergencyEl) emergencyEl.style.display = 'block';
+          
+          setTimeout(() => {
+            if (!window.appStarted && statusEl) {
+               statusEl.innerText = "KB: Still Loading... Try reloading or opening in new window.";
+            }
+          }, 8000);
+        }
+      }, 5000);
+    </script>
+  </body>
+</html>
