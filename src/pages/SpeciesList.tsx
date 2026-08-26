@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { collection, query, where, onSnapshot, getDoc, doc } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { db, auth, collection, query, where, onSnapshot, getDoc, doc, handleFirestoreError, OperationType } from '../lib/db';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ChevronRight, Plus, Filter, Tag, Info } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { handleFirestoreError, OperationType } from '../firebase';
 
 interface Species {
   id: string;

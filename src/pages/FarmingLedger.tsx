@@ -10,11 +10,10 @@ import {
   ResponsiveContainer, Cell, AreaChart, Area 
 } from 'recharts';
 import { useTranslation } from 'react-i18next';
-import { db, auth } from '../firebase';
 import { 
-  collection, addDoc, query, where, onSnapshot, 
+  db, auth, collection, addDoc, query, where, onSnapshot, 
   deleteDoc, doc, serverTimestamp, orderBy 
-} from 'firebase/firestore';
+} from '../lib/db';
 import { format } from 'date-fns';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';

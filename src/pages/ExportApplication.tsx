@@ -3,11 +3,10 @@ import { motion } from 'motion/react';
 import { Send, MapPin, Phone, User, Package, Info, CheckCircle2, Globe, FileImage, Image as ImageIcon, ShieldCheck, Camera } from 'lucide-react';
 import { useState } from 'react';
 import { BANGLADESH_DISTRICTS, DISTRICT_UPAZILAS } from '../constants/districts';
-import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { db, auth, collection, addDoc, serverTimestamp, query, where, getDocs } from '../lib/db';
 import { useNavigate } from 'react-router-dom';
 
-import { compressBase64 } from '../lib/imageUtils';
+import { compressBase64, uploadToCloudinary } from '../lib/imageUtils';
 
 export default function ExportApplication() {
   const { i18n } = useTranslation();
@@ -28,20 +27,20 @@ export default function ExportApplication() {
     details: ''
   });
 
-  const handleNidUpload = (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
+  const handleNidUpload = async (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
     const file = e.target.files?.[0];
     if (!file) return;
     
     setIsCompressing(true);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      const compressed = await compressBase64(base64, 300, 300, 0.2);
-      if (side === 'front') setNidFront(compressed);
-      else setNidBack(compressed);
+    try {
+      const url = await uploadToCloudinary(file, 'krishi-exports');
+      if (side === 'front') setNidFront(url);
+      else setNidBack(url);
+    } catch (err) {
+      console.error("Export NID upload error:", err);
+    } finally {
       setIsCompressing(false);
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const lookupAgent = async (id: string) => {

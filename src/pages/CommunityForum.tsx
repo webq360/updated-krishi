@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare, Users, Plus, Search, ThumbsUp, MessageCircle, Share2, User, Loader2, X, Send } from 'lucide-react';
-import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, updateDoc, doc, increment } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { 
+  db, auth, collection, onSnapshot, query, orderBy, 
+  addDoc, serverTimestamp, updateDoc, doc, increment, 
+  handleFirestoreError, OperationType 
+} from '../lib/db';
 import { cn } from '../lib/utils';
-import { handleFirestoreError, OperationType } from '../firebase';
 
 export default function CommunityForum() {
   const { t, i18n } = useTranslation();
@@ -26,13 +28,15 @@ export default function CommunityForum() {
 
   const handleAddPost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth.currentUser) return;
+    const user = auth.currentUser;
+    if (!user) return;
+    const uid = user.id || user.uid || user._id;
     
     try {
       await addDoc(collection(db, 'forumPosts'), {
         ...newPost,
-        authorId: auth.currentUser.uid,
-        authorName: auth.currentUser.displayName || 'Farmer',
+        authorId: uid,
+        authorName: user.name || user.displayName || user.email?.split('@')[0] || (i18n.language === 'en' ? 'Farmer' : 'কৃষক বন্ধু'),
         likes: 0,
         comments: 0,
         createdAt: serverTimestamp()
@@ -130,7 +134,7 @@ export default function CommunityForum() {
                 <div>
                   <h4 className="font-bold text-[#1B301B] dark:text-white">{post.authorName}</h4>
                   <p className="text-[10px] text-[#8BA88B] dark:text-gray-500 font-bold uppercase tracking-widest">
-                    {post.createdAt?.toDate().toLocaleDateString() || 'Just now'}
+                    {post.createdAt?.toDate ? post.createdAt.toDate().toLocaleDateString() : (post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Just now')}
                   </p>
                 </div>
                 <div className="ml-auto px-3 py-1 bg-[#E8F5E9] dark:bg-green-900/20 text-[#2E7D32] dark:text-green-400 text-[10px] font-bold rounded-full uppercase tracking-wider">

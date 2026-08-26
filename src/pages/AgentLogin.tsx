@@ -6,9 +6,7 @@ import {
   User, Lock, ArrowRight, Loader2, AlertCircle, 
   ShieldCheck, BadgeCheck, Users, LayoutDashboard
 } from 'lucide-react';
-import { db, auth } from '../firebase';
-import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { signInAnonymously } from 'firebase/auth';
+import { db, auth, collection, query, where, getDocs, doc, updateDoc } from '../lib/db';
 import { cn } from '../lib/utils';
 import { safeLocalStorage } from '../lib/storage';
 
@@ -67,35 +65,26 @@ export default function AgentLogin() {
           return;
         }
 
-        // Perform Anonymous Login to satisfy Firestore Rules
-        let currentUser = auth.currentUser;
-        if (!currentUser) {
-          const authResult = await signInAnonymously(auth);
-          currentUser = authResult.user;
-        }
+        const currentUser = auth.currentUser;
+        const uid = currentUser?.id || currentUser?.uid || agentDoc.id;
 
-        // Update the users record to give the agent role
-        await updateDoc(doc(db, 'users', currentUser.uid), {
-          role: 'agent',
-          agentId: agentData.agentId
-        }).catch(async (e) => {
-          // If the user doc doesn't exist, we skip for now or we could create it
-          // In this app, users are created on first login/signup.
-          console.warn("Could not update user role, might be missing doc", e);
-        });
-
-        // Update the agent document with the current UID to "verify" the session for rules
-        // Note: In a real production app, you'd use custom claims or a more robust system.
         await updateDoc(doc(db, 'agents', agentDoc.id), {
-          currentSessionUid: currentUser.uid,
+          currentSessionUid: uid,
           lastLogin: new Date().toISOString()
         });
         
         safeLocalStorage.setItem('agentData', JSON.stringify({
           ...agentData,
           id: agentDoc.id,
-          uid: currentUser.uid
+          uid: uid
         }));
+        safeLocalStorage.setItem('user', JSON.stringify({
+          id: agentDoc.id,
+          name: agentData.name || 'Agent',
+          role: 'agent',
+          agentId: agentData.agentId
+        }));
+        safeLocalStorage.setItem('isUser', 'true');
         navigate('/agent-dashboard');
       } else {
         setError(t('incorrect_agent_id'));
@@ -117,7 +106,7 @@ export default function AgentLogin() {
       >
         <div className="bg-organic-dark p-12 text-center space-y-4">
           <div className="w-20 h-20 flex items-center justify-center mx-auto shadow-xl shadow-organic-green/20">
-            <img src="/logo.png" className="w-full h-full object-contain" alt="Logo" />
+            <img src="/krishi_logo.png" className="w-full h-full object-contain" alt="Logo" />
           </div>
           <div>
             <h2 className="text-3xl font-black text-white tracking-tighter uppercase">{t('agent_login')}</h2>

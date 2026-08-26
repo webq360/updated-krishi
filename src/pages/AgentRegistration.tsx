@@ -8,11 +8,9 @@ import {
   Store, Briefcase, Info, BadgePercent, Zap, Mail
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { db, auth } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db, auth, collection, addDoc, serverTimestamp, handleFirestoreError, OperationType } from '../lib/db';
 import { BANGLADESH_DISTRICTS, DISTRICT_UPAZILAS } from '../constants/districts';
 import { cn } from '../lib/utils';
-import { handleFirestoreError, OperationType } from '../firebase';
 
 export default function AgentRegistration() {
   const { t, i18n } = useTranslation();
@@ -36,29 +34,19 @@ export default function AgentRegistration() {
     nidBack: null as string | null
   });
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'nidFront' | 'nidBack') => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'nidFront' | 'nidBack') => {
     const file = e.target.files?.[0];
     if (file) {
       setVerifying(prev => ({ ...prev, [field]: true }));
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64 = reader.result as string;
-        try {
-          const { compressBase64 } = await import('../lib/imageUtils');
-          const compressed = await compressBase64(base64, 400, 400, 0.2);
-          
-          // Simulate verification delay
-          setTimeout(() => {
-            setFormData(prev => ({ ...prev, [field]: compressed }));
-            setVerifying(prev => ({ ...prev, [field]: false }));
-          }, 1500);
-        } catch (err) {
-          console.error("Compression error", err);
-          setFormData(prev => ({ ...prev, [field]: base64 }));
-          setVerifying(prev => ({ ...prev, [field]: false }));
-        }
-      };
-      reader.readAsDataURL(file);
+      try {
+        const { uploadToCloudinary } = await import('../lib/imageUtils');
+        const uploadedUrl = await uploadToCloudinary(file, 'krishi-agents');
+        setFormData(prev => ({ ...prev, [field]: uploadedUrl }));
+      } catch (err) {
+        console.error("Agent upload error", err);
+      } finally {
+        setVerifying(prev => ({ ...prev, [field]: false }));
+      }
     }
   };
 
@@ -67,11 +55,15 @@ export default function AgentRegistration() {
     setLoading(true);
     setError('');
 
+    const user = auth.currentUser;
+    const uid = user?.id || user?.uid || user?._id || 'anonymous';
+    const email = user?.email || 'anonymous';
+
     try {
       await addDoc(collection(db, 'agentApplications'), {
         ...formData,
-        userId: auth.currentUser?.uid || 'anonymous',
-        userEmail: auth.currentUser?.email || 'anonymous',
+        userId: uid,
+        userEmail: email,
         status: 'pending',
         createdAt: serverTimestamp()
       });

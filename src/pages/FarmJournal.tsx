@@ -6,14 +6,13 @@ import {
   CheckCircle2, Clock, AlertCircle, ChevronRight, Sprout,
   Droplets, Shovel, Scissors, Wheat, ArrowRight, Activity, X
 } from 'lucide-react';
-import { auth, db } from '../firebase';
 import { 
-  collection, addDoc, query, orderBy, onSnapshot, 
-  serverTimestamp, where, deleteDoc, doc, updateDoc 
-} from 'firebase/firestore';
+  auth, db, collection, addDoc, query, orderBy, onSnapshot, 
+  serverTimestamp, where, deleteDoc, doc, updateDoc,
+  handleFirestoreError, OperationType 
+} from '../lib/db';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
-import { handleFirestoreError, OperationType } from '../firebase';
 
 interface JournalEntry {
   id: string;

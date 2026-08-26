@@ -8,8 +8,7 @@ import {
   Navigation, Crosshair, ChevronRight, Info, Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { db } from '../firebase';
-import { collection, query, onSnapshot, where, getDocs } from 'firebase/firestore';
+import { db, collection, query, onSnapshot, where, getDocs } from '../lib/db';
 import { useTranslation } from 'react-i18next';
 import { BANGLADESH_DISTRICTS } from '../constants/districts';
 

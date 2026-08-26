@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 import { Landmark, User, Phone, MapPin, Camera, Send, Loader2, CheckCircle2, FileImage, Image as ImageIcon, History, CreditCard, Calendar, TrendingUp, Info, Activity, Wheat, Bird, Fish, Beef, Sprout } from 'lucide-react';
-import { auth, db } from '../firebase';
-import { collection, addDoc, serverTimestamp, query, where, onSnapshot, orderBy, limit, getDocs } from 'firebase/firestore';
+import { auth, db, collection, addDoc, serverTimestamp, query, where, onSnapshot, orderBy, limit, getDocs } from '../lib/db';
 import { cn } from '../lib/utils';
 import { BANGLADESH_DISTRICTS, DISTRICT_UPAZILAS } from '../constants/districts';
 
-import { compressBase64 } from '../lib/imageUtils';
+import { compressBase64, uploadToCloudinary } from '../lib/imageUtils';
 
 export default function BondhuRin() {
   const { t, i18n } = useTranslation();
@@ -485,21 +484,14 @@ export default function BondhuRin() {
                     const file = e.target.files?.[0];
                     if(file) {
                       setVerifying(prev => ({ ...prev, front: true }));
-                      const reader = new FileReader();
-                      reader.onload = async (ev) => {
-                        const base64 = ev.target?.result as string;
-                        try {
-                          const compressed = await compressBase64(base64, 300, 300, 0.2);
-                          setTimeout(() => {
-                            setNidFront(compressed);
-                            setVerifying(prev => ({ ...prev, front: false }));
-                          }, 1500);
-                        } catch (err) {
-                          setNidFront(base64);
-                          setVerifying(prev => ({ ...prev, front: false }));
-                        }
-                      };
-                      reader.readAsDataURL(file);
+                      try {
+                        const url = await uploadToCloudinary(file, 'krishi-loans');
+                        setNidFront(url);
+                      } catch (err) {
+                        console.error("NID front upload error:", err);
+                      } finally {
+                        setVerifying(prev => ({ ...prev, front: false }));
+                      }
                     }
                   }}
                   className="hidden"
@@ -516,7 +508,7 @@ export default function BondhuRin() {
                   {verifying.front ? (
                     <div className="flex flex-col items-center gap-2 text-organic-green">
                       <Loader2 className="animate-spin" size={24} />
-                      <span className="text-[10px] font-black uppercase tracking-widest">{i18n.language === 'en' ? 'Verifying...' : 'যাচাই করা হচ্ছে...'}</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest">{i18n.language === 'en' ? 'Uploading...' : 'আপলোড হচ্ছে...'}</span>
                     </div>
                   ) : nidFront ? (
                     <div className="flex flex-col items-center gap-2 text-organic-green relative z-10">
@@ -546,21 +538,14 @@ export default function BondhuRin() {
                     const file = e.target.files?.[0];
                     if(file) {
                       setVerifying(prev => ({ ...prev, back: true }));
-                      const reader = new FileReader();
-                      reader.onload = async (ev) => {
-                        const base64 = ev.target?.result as string;
-                        try {
-                          const compressed = await compressBase64(base64, 300, 300, 0.2);
-                          setTimeout(() => {
-                            setNidBack(compressed);
-                            setVerifying(prev => ({ ...prev, back: false }));
-                          }, 1500);
-                        } catch (err) {
-                          setNidBack(base64);
-                          setVerifying(prev => ({ ...prev, back: false }));
-                        }
-                      };
-                      reader.readAsDataURL(file);
+                      try {
+                        const url = await uploadToCloudinary(file, 'krishi-loans');
+                        setNidBack(url);
+                      } catch (err) {
+                        console.error("NID back upload error:", err);
+                      } finally {
+                        setVerifying(prev => ({ ...prev, back: false }));
+                      }
                     }
                   }}
                   className="hidden"
@@ -577,7 +562,7 @@ export default function BondhuRin() {
                   {verifying.back ? (
                     <div className="flex flex-col items-center gap-2 text-organic-green">
                       <Loader2 className="animate-spin" size={24} />
-                      <span className="text-[10px] font-black uppercase tracking-widest">{i18n.language === 'en' ? 'Verifying...' : 'যাচাই করা হচ্ছে...'}</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest">{i18n.language === 'en' ? 'Uploading...' : 'আপলোড হচ্ছে...'}</span>
                     </div>
                   ) : nidBack ? (
                     <div className="flex flex-col items-center gap-2 text-organic-green relative z-10">
@@ -747,12 +732,12 @@ export default function BondhuRin() {
                           <span className="text-xs font-black text-[#1B301B] uppercase">{i18n.language === 'en' ? 'Monthly Multiplier' : 'মাসিক বৃদ্ধির হার'}</span>
                         </div>
                         <p className="text-xl font-black text-[#1B301B]">
-                          {Math.pow(2, Math.max(0, Math.floor((Date.now() - (activeLoan.approvalDate?.toDate?.() || activeLoan.createdAt?.toDate?.() || Date.now())) / (30 * 24 * 60 * 60 * 1000))))}% 
+                          {Math.pow(2, Math.max(0, Math.floor((Date.now() - (activeLoan.approvalDate?.toDate?.()?.getTime() || (activeLoan.approvalDate ? new Date(activeLoan.approvalDate).getTime() : Date.now()))) / (30 * 24 * 60 * 60 * 1000))))}% 
                         </p>
                         <p className="text-[10px] text-[#8BA88B] mt-1 italic leading-tight">
                           {activeLoan.approvalDate ? (
                              <span className="text-[#4CAF50] font-bold">
-                               Approved: {new Date(activeLoan.approvalDate.toDate()).toLocaleDateString()}
+                               Approved: {activeLoan.approvalDate?.toDate ? activeLoan.approvalDate.toDate().toLocaleDateString() : new Date(activeLoan.approvalDate).toLocaleDateString()}
                              </span>
                           ) : (
                              i18n.language === 'en' 

@@ -62,3 +62,39 @@ export function fileToBase64(file: File): Promise<string> {
     reader.onerror = (error) => reject(error);
   });
 }
+
+/**
+ * Uploads an image (File or base64 data string) to Cloudinary via the backend API.
+ * Falls back to high-quality compressed image if Cloudinary credentials are not set.
+ */
+export async function uploadToCloudinary(fileOrBase64: File | string, folder = 'krishi-bondhu'): Promise<string> {
+  try {
+    let base64Data: string;
+    if (typeof fileOrBase64 === 'string') {
+      base64Data = fileOrBase64;
+    } else {
+      base64Data = await fileToBase64(fileOrBase64);
+    }
+
+    // Client-side optimize before sending
+    const compressedData = await compressBase64(base64Data, 1000, 1000, 0.75);
+
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: compressedData, folder })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.url) {
+        return data.url;
+      }
+    }
+    return compressedData;
+  } catch (error) {
+    console.warn("Upload helper error, returning local preview:", error);
+    if (typeof fileOrBase64 === 'string') return fileOrBase64;
+    return await fileToBase64(fileOrBase64);
+  }
+}

@@ -29,6 +29,7 @@ async function resetAdminUser() {
       password,
       firstName: 'Admin',
       lastName: 'User',
+      name: 'Admin User',
       role: 'admin',
       isVerified: true
     });

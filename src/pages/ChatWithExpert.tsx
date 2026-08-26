@@ -2,12 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, User, ShieldCheck, MessageSquare, Phone, Video, Smile, MoreVertical, Mic, MicOff, Loader2, Volume2, AlertCircle, Globe, X, Sprout } from 'lucide-react';
-import { auth, db } from '../firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, limit, where } from 'firebase/firestore';
+import { Send, User, ShieldCheck, MessageSquare, Phone, Video, Smile, MoreVertical, Mic, MicOff, Loader2, Volume2, AlertCircle, Globe, X, Sprout, Languages } from 'lucide-react';
+import { auth, db, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, limit, where, handleFirestoreError, OperationType, onAuthStateChanged } from '../lib/db';
 import { cn } from '../lib/utils';
-import { handleFirestoreError, OperationType } from '../firebase';
 
 interface Message {
   id: string;
@@ -20,12 +17,26 @@ interface Message {
   fileName?: string;
 }
 
+function formatMessageTime(createdAt: any): string {
+  if (!createdAt) return 'Just now';
+  try {
+    if (typeof createdAt === 'object' && typeof createdAt.toDate === 'function') {
+      return createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    const d = new Date(createdAt);
+    if (isNaN(d.getTime())) return 'Just now';
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return 'Just now';
+  }
+}
+
 export default function ChatWithExpert() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState('');
@@ -35,44 +46,64 @@ export default function ChatWithExpert() {
 
   const REGIONAL_OFFICE_NUMBER = '09638-201586';
 
+  const getWelcomeMessage = (): Message => ({
+    id: 'welcome',
+    text: t('welcome_ai_message'),
+    senderId: 'ai-expert',
+    senderName: t('krishi_bondhu_ai'),
+    createdAt: new Date().toISOString(),
+    type: 'ai'
+  });
+
+  // Update welcome message when language changes
   useEffect(() => {
-    // We'll use a local state for messages if the user is not logged in,
-    // or fetch from Firestore if they are.
+    setMessages(prev => {
+      if (prev.length === 0 || (prev.length === 1 && prev[0].id === 'welcome')) {
+        return [getWelcomeMessage()];
+      }
+      return prev.map(m => m.id === 'welcome' ? getWelcomeMessage() : m);
+    });
+  }, [i18n.language]);
+
+  useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setIsAuthReady(true);
       if (!user) {
         setLoading(false);
-        // Default greeting for non-logged in users
-        if (messages.length === 0) {
-          setMessages([{
-            id: 'welcome',
-            text: i18n.language === 'en' 
-              ? "Welcome to Krishi Bondhu AI! How can I help you with your farming today?" 
-              : "কৃষি বন্ধু এআই-তে স্বাগতম! আজ আমি আপনার কৃষিকাজে কীভাবে সাহায্য করতে পারি?",
-            senderId: 'ai-expert',
-            senderName: 'Krishi Bondhu AI',
-            createdAt: { toDate: () => new Date() },
-            type: 'ai'
-          }]);
-        }
+        setMessages((prev) => (prev.length === 0 ? [getWelcomeMessage()] : prev));
         return;
       }
 
+      const uid = user.id || user.uid || user._id;
+      setLoading(true);
+
       const q = query(
         collection(db, 'expertMessages'),
-        where('userId', '==', user.uid),
+        where('userId', '==', uid),
         orderBy('createdAt', 'asc'),
         limit(100)
       );
 
-      const unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
-        const msgs: Message[] = [];
-        snapshot.forEach((doc) => {
-          msgs.push({ id: doc.id, ...doc.data() } as Message);
-        });
-        setMessages(msgs);
-        setLoading(false);
-      }, (err) => handleFirestoreError(err, OperationType.LIST, 'expertMessages'));
+      const unsubscribeSnapshot = onSnapshot(
+        q,
+        (snapshot) => {
+          const msgs: Message[] = (snapshot.docs || []).map((doc: any) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          if (msgs.length === 0) {
+            setMessages([getWelcomeMessage()]);
+          } else {
+            setMessages(msgs);
+          }
+          setLoading(false);
+        },
+        (err) => {
+          handleFirestoreError(err, OperationType.LIST, 'expertMessages');
+          setMessages((prev) => (prev.length === 0 ? [getWelcomeMessage()] : prev));
+          setLoading(false);
+        }
+      );
 
       return () => unsubscribeSnapshot();
     });
@@ -87,7 +118,7 @@ export default function ChatWithExpert() {
 
       recognitionRef.current.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
-        setNewMessage(prev => prev + ' ' + transcript);
+        setNewMessage((prev) => prev + ' ' + transcript);
         setIsListening(false);
       };
 
@@ -95,9 +126,11 @@ export default function ChatWithExpert() {
         setIsListening(false);
         console.error("Speech recognition error:", event.error);
         if (event.error === 'not-allowed') {
-          setError(i18n.language === 'en' 
-            ? "Microphone access denied. Please allow permissions or open the app in a new tab." 
-            : "মাইক্রোফোন অ্যাক্সেস নেই। দয়া করে পারমিশন দিন অথবা অ্যাপটি নতুন ট্যাবে খুলুন।");
+          setError(
+            i18n.language === 'en' 
+              ? "Microphone access denied. Please allow permissions or open the app in a new tab." 
+              : "মাইক্রোফোন অ্যাক্সেস নেই। দয়া করে পারমিশন দিন অথবা অ্যাপটি নতুন ট্যাবে খুলুন।"
+          );
         }
       };
     }
@@ -111,31 +144,39 @@ export default function ChatWithExpert() {
     }
   }, [messages, isAiTyping]);
 
+  const toggleLanguage = () => {
+    const nextLang = i18n.language === 'bn' ? 'en' : 'bn';
+    i18n.changeLanguage(nextLang);
+  };
+
   const handleVoiceCall = () => {
     window.location.href = `tel:${REGIONAL_OFFICE_NUMBER.replace(/-/g, '')}`;
   };
 
   const handleVideoCall = () => {
-    // WhatsApp video call link
     window.location.href = `https://wa.me/${REGIONAL_OFFICE_NUMBER.replace(/[+-]/g, '')}`;
   };
 
   const toggleListening = async () => {
+    if (!recognitionRef.current) {
+      alert("Speech recognition is not supported in this browser. Please use Google Chrome.");
+      return;
+    }
+
     if (isListening) {
-      recognitionRef.current?.stop();
+      recognitionRef.current.stop();
       setIsListening(false);
     } else {
-      setError('');
       try {
-        // Request microphone access explicitly to trigger permission prompt
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-        recognitionRef.current?.start();
+        setError('');
         setIsListening(true);
+        recognitionRef.current.start();
       } catch (err: any) {
-        console.error("Microphone access error:", err.message || err);
+        setIsListening(false);
+        console.error("Recognition start error:", err);
         setError(i18n.language === 'en' 
-          ? "Microphone access denied. Please allow permissions or open the app in a new tab." 
-          : "মাইক্রোফোন অ্যাক্সেস নেই। দয়া করে পারমিশন দিন অথবা অ্যাপটি নতুন ট্যাবে খুলুন।");
+          ? "Microphone access error. Please try again." 
+          : "মাইক্রোফোন চালু করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
       }
     }
   };
@@ -154,8 +195,11 @@ export default function ChatWithExpert() {
 
   const getAiResponse = async (userText: string) => {
     setIsAiTyping(true);
+    const currentUser = auth.currentUser;
+    const uid = currentUser?.id || currentUser?.uid || currentUser?._id;
+
     try {
-      const systemInstruction = "You are an expert Agricultural Consultant for KRISHI BONDHU (a digital solution of ABS FEED INDUSTRIES LIMITED). Your name is 'Krishi Bondhu AI'. You help farmers with crop diseases, livestock health, and farming techniques. Instructions: 1. Always be polite and professional. 2. Provide practical, easy-to-follow agricultural advice. 3. Answer in Bengali if the user asks in Bengali. 4. Specifically mention 'KRISHI BONDHU' and 'ABS FEED' in your responses. 5. ONLY answer questions related to agriculture, farming, crops, livestock, fisheries, and poultry. If the question is outside this domain, politely inform them that you are an agriculture expert dedicated to KRISHI BONDHU. 6. Provide specific advice for fertilizers, irrigation, or medicines, but always advise consulting a local vet or specialist for serious cases. 7. For Fish/Fisheries, recommend 'ABS Fish Feed'. For Poultry, recommend 'ABS Poultry Feed'. For Livestock/Cattle, recommend 'ABS Cattle Feed'. 8. If the user needs human assistance, provide the ABS FEED hotline: 09638-201586.";
+      const systemInstruction = `You are an expert Agricultural Consultant for KRISHI BONDHU (a digital solution of ABS FEED INDUSTRIES LIMITED). Your name is 'Krishi Bondhu AI'. Current active user interface language is: ${i18n.language}. Provide clear, friendly, and practical advice. For crop diseases, give diagnosis and treatment. For feeds, recommend ABS Feed.`;
       
       const response = await fetch("/api/ai/chat", {
         method: "POST",
@@ -163,57 +207,57 @@ export default function ChatWithExpert() {
         body: JSON.stringify({
           prompt: userText,
           systemInstruction,
-          // We could pass history here for better context
-          history: messages.slice(-5).map(m => ({
-            role: (m.senderId === auth.currentUser?.uid || m.senderId === 'guest') ? 'user' : 'model',
+          history: messages.slice(-5).map((m) => ({
+            role: (m.senderId === uid || m.senderId === 'guest') ? 'user' : 'model',
             text: m.text
           }))
         })
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to get AI response");
+      let aiText = i18n.language === 'en' 
+        ? "Krishi Bondhu AI is ready to help. Please provide more details about your crops or livestock."
+        : "কৃষি বন্ধু এআই আপনার প্রশ্নের সমাধানে প্রস্তুত। আপনার সমস্যার আরও কিছু বিস্তারিত বিবরণ লিখুন।";
+        
+      if (response.ok) {
+        const data = await response.json();
+        if (data.text) {
+          aiText = data.text;
+        }
       }
 
-      const data = await response.json();
-      let aiText = data.text || "I'm sorry, I couldn't process that.";
-
-      if (auth.currentUser) {
+      if (currentUser && uid) {
         await addDoc(collection(db, 'expertMessages'), {
           text: aiText,
-          userId: auth.currentUser.uid,
+          userId: uid,
           senderId: 'ai-expert',
-          senderName: 'Krishi Bondhu AI',
+          senderName: t('krishi_bondhu_ai'),
           createdAt: serverTimestamp(),
           type: 'ai'
         });
       } else {
-        // Local addition for guest
         const aiMsg: Message = {
           id: Date.now().toString(),
           text: aiText,
           senderId: 'ai-expert',
-          senderName: 'Krishi Bondhu AI',
-          createdAt: { toDate: () => new Date() },
+          senderName: t('krishi_bondhu_ai'),
+          createdAt: new Date().toISOString(),
           type: 'ai'
         };
-        setMessages(prev => [...prev, aiMsg]);
+        setMessages((prev) => [...prev, aiMsg]);
       }
     } catch (err: any) {
-      console.error("Gemini Error:", err.message || err);
-      // Fallback for AI response in UI if not logged in
-      if (!auth.currentUser) {
-        const guestAiMsg: Message = {
-          id: Date.now().toString(),
-          text: "I'm having a little trouble connecting right now, but I'm here to help! Please ask about your crops or livestock.",
-          senderId: 'ai-expert',
-          senderName: 'Krishi Bondhu AI',
-          createdAt: { toDate: () => new Date() },
-          type: 'ai'
-        };
-        setMessages(prev => [...prev, guestAiMsg]);
-      }
+      console.error("AI Error:", err.message || err);
+      const fallbackAiMsg: Message = {
+        id: Date.now().toString(),
+        text: i18n.language === 'en'
+          ? "Krishi Bondhu AI is at your service. Ask any question regarding crops, fish, or livestock."
+          : "কৃষি বন্ধু এআই আপনার সেবায় প্রস্তুত। আপনার ফসল, মাছ বা পশু সংক্রান্ত সমস্যা সম্পর্কে আরও প্রশ্ন করতে পারেন।",
+        senderId: 'ai-expert',
+        senderName: t('krishi_bondhu_ai'),
+        createdAt: new Date().toISOString(),
+        type: 'ai'
+      };
+      setMessages((prev) => [...prev, fallbackAiMsg]);
     } finally {
       setIsAiTyping(false);
     }
@@ -225,14 +269,16 @@ export default function ChatWithExpert() {
 
     const userText = newMessage;
     setNewMessage('');
+    const currentUser = auth.currentUser;
+    const uid = currentUser?.id || currentUser?.uid || currentUser?._id;
 
-    if (auth.currentUser) {
+    if (currentUser && uid) {
       try {
         await addDoc(collection(db, 'expertMessages'), {
           text: userText,
-          userId: auth.currentUser.uid,
-          senderId: auth.currentUser.uid,
-          senderName: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'Farmer',
+          userId: uid,
+          senderId: uid,
+          senderName: currentUser.name || currentUser.displayName || currentUser.email?.split('@')[0] || t('guest_farmer'),
           createdAt: serverTimestamp(),
           type: 'text'
         });
@@ -240,65 +286,77 @@ export default function ChatWithExpert() {
         console.error("Error sending message:", err.message || err);
       }
     } else {
-      // Local addition for guest
       const guestMsg: Message = {
         id: Date.now().toString(),
         text: userText,
         senderId: 'guest',
-        senderName: 'Farmer',
-        createdAt: { toDate: () => new Date() },
+        senderName: t('guest_farmer'),
+        createdAt: new Date().toISOString(),
         type: 'text'
       };
-      setMessages(prev => [...prev, guestMsg]);
+      setMessages((prev) => [...prev, guestMsg]);
     }
 
     // Trigger AI Response
     getAiResponse(userText);
   };
 
+  const currentUserId = auth.currentUser?.id || auth.currentUser?.uid || auth.currentUser?._id;
+
   return (
     <div className="flex flex-col h-[calc(100vh-120px)] bg-white rounded-[2.5rem] border border-[#E0E8E0] shadow-2xl overflow-hidden">
       {/* Header */}
-      <div className="p-8 bg-organic-dark text-white flex items-center justify-between border-b border-white/5 relative overflow-hidden">
+      <div className="p-6 sm:p-8 bg-organic-dark text-white flex items-center justify-between border-b border-white/5 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-organic-green/5 to-transparent pointer-events-none" />
-        
-        <div className="relative z-10 flex items-center gap-6">
+        <div className="flex items-center gap-4 sm:gap-6 relative z-10">
           <div className="relative">
-            <div className="w-16 h-16 bg-white rounded-[1.5rem] flex items-center justify-center text-organic-green shadow-2xl overflow-hidden">
-              <img src="https://images.unsplash.com/photo-1542435503-956c469947f6?auto=format&fit=crop&q=80&w=100&h=100" alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />
-              <Sprout size={36} className="relative z-10" />
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#4CAF50]/20 border border-[#4CAF50]/30 flex items-center justify-center text-[#4CAF50] shadow-inner">
+              <Sprout size={30} />
             </div>
-            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-organic-green border-4 border-organic-dark rounded-full shadow-lg" />
+            <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-[#4CAF50] border-2 border-[#1B301B] rounded-full" />
           </div>
           <div>
-            <h2 className="font-black text-2xl tracking-tighter uppercase leading-tight">
-              {i18n.language === 'en' ? 'Krishi' : 'কৃষি'} <span className="text-organic-green">{i18n.language === 'en' ? 'Expert' : 'বিশেষজ্ঞ'}</span>
-            </h2>
-            <div className="flex items-center gap-2 mt-1">
-              <div className="w-2 h-2 rounded-full bg-organic-green animate-pulse" />
-              <p className="text-white/50 text-[10px] font-black uppercase tracking-[0.2em]">Live Supported by AI</p>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight">{t('krishi_bondhu_ai')}</h2>
+              <span className="px-2.5 py-0.5 bg-[#4CAF50]/20 text-[#4CAF50] border border-[#4CAF50]/30 rounded-full text-[10px] font-black uppercase tracking-wider">
+                {t('active_now')}
+              </span>
             </div>
+            <p className="text-xs text-[#8BA88B] font-medium flex items-center gap-1.5 mt-1">
+              <ShieldCheck size={14} className="text-[#4CAF50]" />
+              {t('official_agri_consultant')}
+            </p>
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
-          <div className="hidden sm:flex flex-col items-end mr-4">
-            <span className="text-[10px] font-black uppercase tracking-widest text-organic-green/60">ABS FEED Hotline</span>
-            <span className="text-lg font-black tracking-tighter">09638-201586</span>
+        <div className="flex items-center gap-3 sm:gap-4 relative z-10">
+          {/* Quick Language Toggle */}
+          <button
+            onClick={toggleLanguage}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-xs font-bold text-white transition-all shadow-sm"
+            title="Change Language"
+          >
+            <Languages size={15} className="text-[#4CAF50]" />
+            <span>{i18n.language === 'bn' ? 'বাংলা' : 'English'}</span>
+          </button>
+
+          <div className="hidden md:flex flex-col items-end mr-2">
+            <span className="text-[10px] font-black uppercase tracking-widest text-organic-green/60">{t('hotline_label')}</span>
+            <span className="text-base font-black tracking-tighter">09638-201586</span>
           </div>
           <button 
             onClick={handleVoiceCall}
-            className="p-4 bg-white/5 hover:bg-white/10 rounded-2xl transition-all group relative border border-white/10"
-            title="Call Regional Office"
+            className="p-3 sm:p-4 bg-white/5 hover:bg-white/10 rounded-2xl transition-all group relative border border-white/10"
+            title={t('call_regional_office')}
           >
-            <Phone size={24} className="text-white group-hover:text-organic-green transition-colors" />
+            <Phone size={20} className="text-white group-hover:text-organic-green transition-colors" />
           </button>
           <button 
             onClick={handleVideoCall}
-            className="p-4 bg-white/5 hover:bg-white/10 rounded-2xl transition-all group relative border border-white/10"
-            title="WhatsApp Video Call"
+            className="p-3 sm:p-4 bg-white/5 hover:bg-white/10 rounded-2xl transition-all group relative border border-white/10"
+            title={t('whatsapp_video_call')}
           >
-            <Video size={24} className="text-white group-hover:text-organic-green transition-colors" />
+            <Video size={20} className="text-white group-hover:text-organic-green transition-colors" />
           </button>
         </div>
       </div>
@@ -308,7 +366,7 @@ export default function ChatWithExpert() {
         ref={scrollRef}
         className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#F9FBF9] no-scrollbar"
       >
-        {loading || !isAuthReady ? (
+        {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="w-8 h-8 border-4 border-[#4CAF50] border-t-transparent rounded-full animate-spin" />
           </div>
@@ -321,7 +379,7 @@ export default function ChatWithExpert() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 className={cn(
                   "flex flex-col max-w-[85%]",
-                  (msg.senderId === auth.currentUser?.uid || msg.senderId === 'guest') ? "ml-auto items-end" : "items-start"
+                  (msg.senderId === currentUserId || msg.senderId === 'guest') ? "ml-auto items-end" : "items-start"
                 )}
               >
                 <div className="flex items-center gap-2 mb-1">
@@ -329,12 +387,12 @@ export default function ChatWithExpert() {
                     {msg.senderName}
                   </span>
                   <span className="text-[8px] text-[#B0C4B0]">
-                    {msg.createdAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {formatMessageTime(msg.createdAt)}
                   </span>
                 </div>
                 <div className={cn(
                   "px-5 py-3 rounded-2xl text-sm font-medium shadow-sm relative group transition-all hover:shadow-md",
-                  (msg.senderId === auth.currentUser?.uid || msg.senderId === 'guest')
+                  (msg.senderId === currentUserId || msg.senderId === 'guest')
                     ? "bg-gradient-to-br from-[#4CAF50] to-[#388E3C] text-white rounded-tr-none" 
                     : msg.senderId === 'ai-expert'
                     ? "bg-[#1B301B] text-white rounded-tl-none border-l-4 border-[#4CAF50]"
@@ -366,11 +424,11 @@ export default function ChatWithExpert() {
                 className="flex flex-col items-start max-w-[80%]"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] font-black text-[#8BA88B] uppercase tracking-widest">Krishi Bondhu AI</span>
+                  <span className="text-[10px] font-black text-[#8BA88B] uppercase tracking-widest">{t('krishi_bondhu_ai')}</span>
                 </div>
                 <div className="bg-[#1B301B] text-white px-5 py-3 rounded-2xl rounded-tl-none flex items-center gap-2">
                   <Loader2 size={16} className="animate-spin text-[#4CAF50]" />
-                  <span className="text-xs italic">AI is thinking...</span>
+                  <span className="text-xs italic">{t('ai_typing')}</span>
                 </div>
               </motion.div>
             )}
@@ -378,66 +436,46 @@ export default function ChatWithExpert() {
         )}
       </div>
 
-      {/* Input */}
-      <div className="bg-white border-t border-[#E0E8E0]">
-        {error && (
-          <div className="px-4 py-3 bg-red-50 text-red-600 text-sm flex flex-col gap-2 border-b border-red-100">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertCircle size={16} />
-                <span>{error}</span>
-              </div>
-              <button onClick={() => setError('')}><X size={16} /></button>
-            </div>
-            {error.includes('tab') && (
-              <button
-                type="button"
-                onClick={() => window.open(window.location.href, '_blank')}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-all"
-              >
-                <Globe size={14} />
-                {i18n.language === 'en' ? 'Open in New Tab' : 'নতুন ট্যাবে খুলুন'}
-              </button>
-            )}
-          </div>
-        )}
-        <form 
-          onSubmit={handleSendMessage}
-          className="p-4 flex items-center gap-3"
+      {error && (
+        <div className="px-6 py-2 bg-red-50 text-red-600 text-xs font-bold flex items-center gap-2 border-t border-red-100">
+          <AlertCircle size={14} />
+          {error}
+        </div>
+      )}
+
+      {/* Input Form */}
+      <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-[#E0E8E0] flex items-center gap-3">
+        <button
+          type="button"
+          onClick={toggleListening}
+          className={cn(
+            "p-3.5 rounded-2xl transition-all flex items-center justify-center relative",
+            isListening 
+              ? "bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30" 
+              : "bg-[#F0F5F0] text-[#556B55] hover:bg-[#E0E8E0]"
+          )}
+          title={isListening ? t('listening') : t('voice_input')}
         >
-        <div className="flex items-center gap-1">
-          <button 
-            type="button" 
-            onClick={toggleListening}
-            className={cn(
-              "p-2 rounded-xl transition-all",
-              isListening ? "bg-red-100 text-red-500 animate-pulse" : "text-[#8BA88B] hover:bg-[#F0F5F0]"
-            )}
-          >
-            {isListening ? <MicOff size={20} /> : <Mic size={20} />}
-          </button>
-        </div>
-        <div className="flex-1 relative">
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder={i18n.language === 'en' ? "Ask Krishi Bondhu AI..." : "কৃষি বন্ধু এআই-কে জিজ্ঞাসা করুন..."}
-            className="w-full pl-6 pr-20 py-3.5 bg-[#F9FBF9] border border-[#E0E8E0] rounded-2xl focus:border-[#4CAF50] outline-none text-xs sm:text-sm font-medium"
-          />
-          <button type="button" className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8BA88B] hover:text-[#4CAF50]">
-            <Smile size={20} />
-          </button>
-        </div>
-        <button 
+          {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+        </button>
+
+        <input
+          type="text"
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          placeholder={t('ask_anything_placeholder')}
+          className="flex-1 px-6 py-3.5 bg-[#F9FBF9] border border-[#E0E8E0] rounded-2xl text-sm font-medium focus:outline-none focus:border-[#4CAF50] focus:ring-4 focus:ring-[#4CAF50]/10 transition-all text-[#1B301B] placeholder-[#8BA88B]"
+        />
+
+        <button
           type="submit"
-          disabled={!newMessage.trim() || isAiTyping}
-          className="w-14 h-14 bg-[#1B301B] text-white rounded-2xl flex items-center justify-center hover:bg-[#2E4A2E] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+          disabled={!newMessage.trim()}
+          className="p-3.5 bg-[#4CAF50] text-white rounded-2xl hover:bg-[#388E3C] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-[#4CAF50]/30 hover:scale-105 active:scale-95"
+          title={t('send')}
         >
-          <Send size={24} />
+          <Send size={20} />
         </button>
       </form>
     </div>
-  </div>
   );
 }

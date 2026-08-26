@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, doc, onSnapshot, collection, query, where, handleFirestoreError, OperationType } from '../lib/db';
 import { motion } from 'motion/react';
-import { handleFirestoreError, OperationType } from '../firebase';
 import { 
   ArrowLeft, 
   Info, 

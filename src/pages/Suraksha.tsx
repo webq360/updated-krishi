@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 import { Shield, Wheat, Bird, Fish, Beef, Sprout, TrendingUp, Send, Loader2, CheckCircle2, Calculator, Info, MapPin, Camera, FileImage, Image as ImageIcon, AlertCircle, History, RefreshCw, Calendar, FileText, User } from 'lucide-react';
-import { auth, db } from '../firebase';
-import { collection, addDoc, serverTimestamp, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { auth, db, collection, addDoc, serverTimestamp, query, where, onSnapshot, orderBy, limit } from '../lib/db';
 import { cn } from '../lib/utils';
 import { BANGLADESH_DISTRICTS, DISTRICT_UPAZILAS } from '../constants/districts';
 
@@ -56,8 +55,8 @@ export default function Suraksha() {
     }
     setIsSearchingAgent(true);
     try {
-      const { getDocs, query, where } = await import('firebase/firestore');
-      const q = query(collection(db, 'agents'), where('agentId', '==', id.toUpperCase()), where('status', '!=', 'suspended'));
+      const { getDocs, query, where } = await import('../lib/db');
+      const q = query(collection(db, 'agents'), where('agentId', '==', id.toUpperCase()));
       const snap = await getDocs(q);
       if (!snap.empty) {
         setAgentDetails(snap.docs[0].data());
@@ -780,7 +779,7 @@ export default function Suraksha() {
                 {activeProtection.approvalDate && (
                   <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
                     <p className="text-[10px] text-blue-600 font-black uppercase tracking-widest">{i18n.language === 'en' ? 'Approval Date' : 'অনুমোদনের তারিখ'}</p>
-                    <p className="text-sm font-black text-blue-800">{new Date(activeProtection.approvalDate.toDate()).toLocaleDateString()}</p>
+                    <p className="text-sm font-black text-blue-800">{activeProtection.approvalDate?.toDate ? activeProtection.approvalDate.toDate().toLocaleDateString() : new Date(activeProtection.approvalDate).toLocaleDateString()}</p>
                   </div>
                 )}
               </div>

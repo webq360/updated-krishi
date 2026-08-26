@@ -13,12 +13,11 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer, Cell, AreaChart, Area
 } from 'recharts';
-import { db } from '../firebase';
 import { 
-  collection, query, where, getDocs, 
+  db, collection, query, where, getDocs, 
   updateDoc, doc, addDoc, serverTimestamp, 
   orderBy, onSnapshot 
-} from 'firebase/firestore';
+} from '../lib/db';
 import { safeLocalStorage } from '../lib/storage';
 import { cn } from '../lib/utils';
 import { format, startOfMonth, subMonths, isSameMonth } from 'date-fns';
@@ -235,7 +234,7 @@ export default function AgentDashboard() {
             animate={{ scale: 1, opacity: 1 }}
             className="w-24 h-24 sm:w-32 sm:h-32 flex items-center justify-center shadow-2xl shadow-organic-green/30 shrink-0"
           >
-            <img src="/logo.png" className="w-full h-full object-contain" alt="Logo" />
+            <img src="/krishi_logo.png" className="w-full h-full object-contain" alt="Logo" />
           </motion.div>
           <div className="text-center sm:text-left space-y-3">
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">

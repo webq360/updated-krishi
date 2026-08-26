@@ -2,10 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Search, Filter, X, MoreVertical, CheckCircle2, User, Loader2, ThumbsUp, Share2, Youtube, Clock, Eye, ChevronRight } from 'lucide-react';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, collection, onSnapshot, query, orderBy, handleFirestoreError, OperationType } from '../lib/db';
 import { cn } from '../lib/utils';
-import { handleFirestoreError, OperationType } from '../firebase';
 
 interface Video {
   id: string;

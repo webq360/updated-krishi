@@ -3,11 +3,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { MapPin, Phone, Plus, Search, Snowflake, Database, Info, CheckCircle2, FileImage, Image as ImageIcon, CreditCard, ShieldCheck } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { BANGLADESH_DISTRICTS, DISTRICT_UPAZILAS } from '../constants/districts';
-import { collection, addDoc, serverTimestamp, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { db, auth, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy } from '../lib/db';
 import { cn } from '../lib/utils';
 
-import { compressBase64 } from '../lib/imageUtils';
+import { compressBase64, uploadToCloudinary } from '../lib/imageUtils';
 
 export default function ColdStorage() {
   const { i18n } = useTranslation();
@@ -35,21 +34,21 @@ export default function ColdStorage() {
   const AD_CHARGE = 50;
   const PAYMENT_NUMBER = '+8801634-651943';
 
-  const handleNidUpload = (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back' | 'storage') => {
+  const handleNidUpload = async (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back' | 'storage') => {
     const file = e.target.files?.[0];
     if (!file) return;
     
     setIsCompressing(prev => ({ ...prev, [side]: true }));
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      const compressed = await compressBase64(base64, side === 'storage' ? 600 : 400, side === 'storage' ? 400 : 400, side === 'storage' ? 0.5 : 0.3);
-      if (side === 'front') setNidFront(compressed);
-      else if (side === 'back') setNidBack(compressed);
-      else setStorageImage(compressed);
+    try {
+      const url = await uploadToCloudinary(file, side === 'storage' ? 'krishi-storage' : 'krishi-nid');
+      if (side === 'front') setNidFront(url);
+      else if (side === 'back') setNidBack(url);
+      else setStorageImage(url);
+    } catch (err) {
+      console.error("ColdStorage upload error:", err);
+    } finally {
       setIsCompressing(prev => ({ ...prev, [side]: false }));
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const currentUpazilas = DISTRICT_UPAZILAS[form.district] || [];

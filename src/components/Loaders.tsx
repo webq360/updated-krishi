@@ -16,9 +16,9 @@ export function LoadingScreen() {
             repeat: Infinity,
             ease: "easeInOut"
           }}
-          className="w-32 h-32 sm:w-48 sm:h-48 flex items-center justify-center relative rounded-[40px] overflow-hidden bg-organic-green"
+          className="w-32 h-32 sm:w-48 sm:h-48 flex items-center justify-center relative rounded-[40px] overflow-hidden bg-transparent"
         >
-          <img src="/logo.png" className="w-full h-full object-cover relative z-10" alt="Logo" referrerPolicy="no-referrer" />
+          <img src="/krishi_logo.png" className="w-full h-full object-contain relative z-10" alt="Logo" referrerPolicy="no-referrer" />
         </motion.div>
       </div>
 

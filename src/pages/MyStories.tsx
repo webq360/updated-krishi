@@ -14,24 +14,13 @@ import {
   Loader2,
   Camera
 } from 'lucide-react';
-import { auth, db } from '../firebase';
 import { 
-  collection, 
-  addDoc, 
-  query, 
-  orderBy, 
-  onSnapshot, 
-  serverTimestamp, 
-  doc, 
-  updateDoc, 
-  increment, 
-  deleteDoc,
-  setDoc,
-  getDoc
-} from 'firebase/firestore';
-import { compressBase64 } from '../lib/imageUtils';
+  auth, db, collection, addDoc, query, orderBy, onSnapshot, 
+  serverTimestamp, doc, updateDoc, increment, deleteDoc, setDoc, getDoc,
+  handleFirestoreError, OperationType 
+} from '../lib/db';
+import { compressBase64, uploadToCloudinary } from '../lib/imageUtils';
 import { cn } from '../lib/utils';
-import { handleFirestoreError, OperationType } from '../firebase';
 
 interface Story {
   id: string;
@@ -94,20 +83,21 @@ export default function MyStories() {
   }, []);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    const user = auth.currentUser;
+    if (!user) return;
+    const uid = user.id || user.uid || user._id;
     
     // Listen to user reactions
-    const storyIds = stories.map(s => s.id);
     const unsubscribes: (() => void)[] = [];
 
     stories.forEach(story => {
-      const reactionRef = doc(db, 'stories', story.id, 'reactions', auth.currentUser!.uid);
-      const unsub = onSnapshot(reactionRef, (doc) => {
+      const reactionRef = doc(db, 'stories', story.id, 'reactions', uid);
+      const unsub = onSnapshot(reactionRef, (d) => {
         setUserReactions(prev => ({
           ...prev,
-          [story.id]: doc.exists()
+          [story.id]: d.exists()
         }));
-      }, (err) => handleFirestoreError(err, OperationType.GET, `stories/${story.id}/reactions/${auth.currentUser?.uid}`));
+      }, (err) => handleFirestoreError(err, OperationType.GET, `stories/${story.id}/reactions/${uid}`));
       unsubscribes.push(unsub);
     });
 
@@ -118,25 +108,27 @@ export default function MyStories() {
     const file = e.target.files?.[0];
     if (file) {
       setIsCompressing(true);
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const base64 = event.target?.result as string;
-        const compressed = await compressBase64(base64, 400, 400, 0.3);
-        setImagePreview(compressed);
+      try {
+        const uploadedUrl = await uploadToCloudinary(file, 'krishi-stories');
+        setImagePreview(uploadedUrl);
+      } catch (err) {
+        console.error("Story image upload error:", err);
+      } finally {
         setIsCompressing(false);
-      };
-      reader.readAsDataURL(file);
+      }
     }
   };
 
   const handlePostStory = async () => {
-    if (!auth.currentUser || (!newStory.trim() && !imagePreview)) return;
+    const user = auth.currentUser;
+    if (!user || (!newStory.trim() && !imagePreview)) return;
+    const uid = user.id || user.uid || user._id;
     
     setIsPosting(true);
     try {
       const storyData: any = {
-        userId: auth.currentUser.uid,
-        userName: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'Farmer',
+        userId: uid,
+        userName: user.name || user.displayName || user.email?.split('@')[0] || 'Farmer',
         content: newStory,
         likesCount: 0,
         commentsCount: 0,
@@ -158,9 +150,11 @@ export default function MyStories() {
   };
 
   const handleLike = async (storyId: string) => {
-    if (!auth.currentUser) return;
+    const user = auth.currentUser;
+    if (!user) return;
+    const uid = user.id || user.uid || user._id;
     
-    const reactionRef = doc(db, 'stories', storyId, 'reactions', auth.currentUser.uid);
+    const reactionRef = doc(db, 'stories', storyId, 'reactions', uid);
     const storyRef = doc(db, 'stories', storyId);
     
     if (userReactions[storyId]) {
@@ -168,7 +162,7 @@ export default function MyStories() {
       await updateDoc(storyRef, { likesCount: increment(-1) });
     } else {
       await setDoc(reactionRef, {
-        userId: auth.currentUser.uid,
+        userId: uid,
         storyId,
         timestamp: serverTimestamp()
       });
@@ -184,9 +178,9 @@ export default function MyStories() {
       // Fetch comments
       const q = query(collection(db, 'stories', storyId, 'comments'), orderBy('createdAt', 'asc'));
       onSnapshot(q, (snapshot) => {
-        const commentData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
+        const commentData = snapshot.docs.map(d => ({
+          id: d.id,
+          ...d.data()
         })) as Comment[];
         setComments(prev => ({ ...prev, [storyId]: commentData }));
       }, (err) => handleFirestoreError(err, OperationType.LIST, `stories/${storyId}/comments`));
@@ -194,12 +188,14 @@ export default function MyStories() {
   };
 
   const handleAddComment = async (storyId: string) => {
-    if (!auth.currentUser || !newComment.trim()) return;
+    const user = auth.currentUser;
+    if (!user || !newComment.trim()) return;
+    const uid = user.id || user.uid || user._id;
     
     try {
       await addDoc(collection(db, 'stories', storyId, 'comments'), {
-        userId: auth.currentUser.uid,
-        userName: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'Farmer',
+        userId: uid,
+        userName: user.name || user.displayName || user.email?.split('@')[0] || 'Farmer',
         content: newComment,
         storyId,
         createdAt: serverTimestamp()
@@ -320,11 +316,11 @@ export default function MyStories() {
                     <h3 className="font-bold text-[#1B301B]">{story.userName}</h3>
                     <div className="flex items-center gap-1 text-xs text-[#8BA88B]">
                       <Clock size={12} />
-                      <span>{story.createdAt?.toDate().toLocaleDateString()}</span>
+                      <span>{story.createdAt?.toDate ? story.createdAt.toDate().toLocaleDateString() : (story.createdAt ? new Date(story.createdAt).toLocaleDateString() : 'Just now')}</span>
                     </div>
                   </div>
                 </div>
-                {(auth.currentUser?.uid === story.userId || sessionStorage.getItem('isAdmin') === 'true') && (
+                {((auth.currentUser?.id === story.userId || auth.currentUser?.uid === story.userId || auth.currentUser?._id === story.userId) || sessionStorage.getItem('isAdmin') === 'true') && (
                   <button 
                     onClick={() => handleDeleteStory(story.id)}
                     className="p-2 text-[#8BA88B] hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"

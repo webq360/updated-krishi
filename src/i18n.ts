@@ -237,7 +237,19 @@ const resources = {
       "change_password": "Change Password",
       "invalid_otp": "Invalid OTP. Please try again.",
       "otp_sent": "OTP sent to your phone!",
-      "password_changed": "Password successfully updated!"
+      "password_changed": "Password successfully updated!",
+      "krishi_bondhu_ai": "Krishi Bondhu AI",
+      "active_now": "Active Now",
+      "official_agri_consultant": "Official Agri Consultant",
+      "ai_typing": "AI is thinking...",
+      "ask_anything_placeholder": "Ask any farming, crop, or livestock question...",
+      "call_regional_office": "Call Regional Office",
+      "whatsapp_video_call": "WhatsApp Video Call",
+      "welcome_ai_message": "Welcome to Krishi Bondhu AI! How can I help you with your farming today?",
+      "hotline_label": "ABS FEED Hotline",
+      "voice_input": "Voice Input",
+      "listening": "Listening...",
+      "send": "Send"
     }
   },
   bn: {
@@ -475,7 +487,19 @@ const resources = {
       "change_password": "পাসওয়ার্ড পরিবর্তন করুন",
       "invalid_otp": "ভুল ওটিপি। আবার চেষ্টা করুন।",
       "otp_sent": "আপনার ফোনে ওটিপি পাঠানো হয়েছে!",
-      "password_changed": "পাসওয়ার্ড সফলভাবে আপডেট করা হয়েছে!"
+      "password_changed": "পাসওয়ার্ড সফলভাবে আপডেট করা হয়েছে!",
+      "krishi_bondhu_ai": "কৃষি বন্ধু এআই",
+      "active_now": "সক্রিয় রয়েছে",
+      "official_agri_consultant": "অফিসিয়াল কৃষি পরামর্শক",
+      "ai_typing": "এআই উত্তর লিখছে...",
+      "ask_anything_placeholder": "ফসল, মাছ, গবাদিপশু বা যেকোনো কৃষি প্রশ্ন লিখুন...",
+      "call_regional_office": "আঞ্চলিক অফিসে কল করুন",
+      "whatsapp_video_call": "হোয়াটসঅ্যাপ ভিডিও কল",
+      "welcome_ai_message": "কৃষি বন্ধু এআই-তে স্বাগতম! আজ আমি আপনার কৃষিকাজে কীভাবে সাহায্য করতে পারি?",
+      "hotline_label": "এবিএস ফিড হটলাইন",
+      "voice_input": "ভয়েস ইনপুট",
+      "listening": "শুনছি...",
+      "send": "পাঠান"
     }
   }
 };

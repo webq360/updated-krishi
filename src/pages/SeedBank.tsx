@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sprout, Search, Plus, MapPin, Phone, Info, X, CheckCircle2, RefreshCw, Tag, FileImage, Image as ImageIcon } from 'lucide-react';
-import { collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, where, getDocs } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { db, auth, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, where, getDocs } from '../lib/db';
 import { cn } from '../lib/utils';
 import { BANGLADESH_DISTRICTS, DISTRICT_UPAZILAS } from '../constants/districts';
-import { compressBase64 } from '../lib/imageUtils';
+import { compressBase64, uploadToCloudinary } from '../lib/imageUtils';
 
 interface SeedListing {
   id: string;
@@ -73,21 +72,20 @@ export default function SeedBank() {
     }
   };
 
-  const handleNidUpload = (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back' | 'seed') => {
+  const handleNidUpload = async (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back' | 'seed') => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
     setIsCompressing(prev => ({ ...prev, [side === 'seed' ? 'seed' : 'nid']: true }));
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      const compressed = await compressBase64(base64, side === 'seed' ? 500 : 300, side === 'seed' ? 500 : 300, 0.2);
-      if (side === 'front') setNidFront(compressed);
-      else if (side === 'back') setNidBack(compressed);
-      else setSeedImage(compressed);
+    try {
+      const url = await uploadToCloudinary(file, side === 'seed' ? 'krishi-seeds' : 'krishi-nid');
+      if (side === 'front') setNidFront(url);
+      else if (side === 'back') setNidBack(url);
+      else setSeedImage(url);
+    } catch (err) {
+      console.error("SeedBank image upload error:", err);
+    } finally {
       setIsCompressing(prev => ({ ...prev, [side === 'seed' ? 'seed' : 'nid']: false }));
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const currentUpazilas = DISTRICT_UPAZILAS[form.district] || [];
@@ -107,7 +105,8 @@ export default function SeedBank() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth.currentUser) {
+    const user = auth.currentUser;
+    if (!user) {
       alert(i18n.language === 'en' ? 'Please login to post' : 'পোস্ট করতে লগইন করুন');
       return;
     }
@@ -117,6 +116,8 @@ export default function SeedBank() {
       return;
     }
 
+    const uid = (user as any).id || user.uid || (user as any)._id;
+
     try {
       await addDoc(collection(db, 'seedBank'), {
         ...form,
@@ -125,8 +126,8 @@ export default function SeedBank() {
         seedImage,
         agentId: agentId || null,
         agentName: agentData?.name || null,
-        userId: auth.currentUser.uid,
-        userName: auth.currentUser.displayName || 'Farmer',
+        userId: uid,
+        userName: (user as any).name || user.displayName || 'Farmer',
         createdAt: serverTimestamp()
       });
       setIsPosting(false);

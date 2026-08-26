@@ -1,18 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { auth } from '../firebase';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Lock, AlertCircle, Loader2, Chrome, Globe, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { User, Lock, AlertCircle, Loader2, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { safeLocalStorage } from '../lib/storage';
 
 export default function Login() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [formData, setFormData] = useState({
@@ -28,7 +25,7 @@ export default function Login() {
     }
   }, [navigate]);
 
-  // ==================== MongoDB Email/Password Login ====================
+  // ==================== MongoDB Login ====================
   const handleMongoLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -58,6 +55,9 @@ export default function Login() {
       safeLocalStorage.setItem('authToken', data.token);
       safeLocalStorage.setItem('user', JSON.stringify(data.user));
       safeLocalStorage.setItem('loginMethod', 'mongodb');
+      if (data.user.role === 'admin') {
+        safeLocalStorage.setItem('isAdmin', 'true');
+      }
 
       setSuccess('✅ Login successful! Redirecting...');
 
@@ -70,46 +70,10 @@ export default function Login() {
         }
       }, 1000);
     } catch (err) {
-      setError('Network error. Please try again.');
+      setError('Network error. Please check your connection.');
       console.error('Login error:', err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  // ==================== Firebase Google Login ====================
-  const handleGoogleLogin = async () => {
-    setGoogleLoading(true);
-    setError('');
-    
-    const provider = new GoogleAuthProvider();
-    try {
-      const userCredential = await signInWithPopup(auth, provider);
-      
-      // Save Google login info to localStorage (Firebase auth)
-      safeLocalStorage.setItem('user', JSON.stringify({
-        id: userCredential.user.uid,
-        email: userCredential.user.email,
-        name: userCredential.user.displayName,
-        photoURL: userCredential.user.photoURL,
-        role: 'user'
-      }));
-      safeLocalStorage.setItem('loginMethod', 'google');
-
-      setSuccess('✅ Google login successful!');
-      
-      setTimeout(() => {
-        navigate('/');
-      }, 1000);
-    } catch (err: any) {
-      console.error('Google login error:', err);
-      if (err.code === 'auth/operation-not-allowed') {
-        setError("Google Login is not enabled. Please use email/password login.");
-      } else if (err.code !== 'auth/popup-closed-by-user') {
-        setError("Google login failed. Please try again.");
-      }
-    } finally {
-      setGoogleLoading(false);
     }
   };
 
@@ -165,32 +129,19 @@ export default function Login() {
       </div>
 
       {/* Form Panel */}
-      <div className="flex items-center justify-center p-6 sm:p-12 md:p-20">
-        <div className="w-full max-w-[450px] space-y-12">
-          <div className="flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2 group">
-              <div className="w-10 h-10 flex items-center justify-center group-hover:rotate-12 transition-transform shadow-lg">
-                <img src="/logo.png" className="w-full h-full object-contain" alt="Logo" />
-              </div>
-              <span className="text-2xl font-black text-organic-dark tracking-tighter">কৃষি বন্ধু</span>
-            </Link>
-            <button 
-              onClick={() => i18n.changeLanguage(i18n.language === 'en' ? 'bn' : 'en')}
-              className="px-5 py-2.5 bg-organic-light rounded-full text-[10px] font-black uppercase tracking-widest text-organic-dark hover:bg-organic-green hover:text-white transition-all shadow-sm flex items-center gap-2"
-            >
-              <Globe size={14} />
-              {i18n.language === 'en' ? 'বাংলা' : 'English'}
-            </button>
+      <div className="flex items-center justify-center p-8 sm:p-16 lg:p-24 relative overflow-hidden">
+        <div className="w-full max-w-md space-y-10 relative z-10">
+          <div className="space-y-3">
+            <h2 className="text-4xl sm:text-5xl font-black uppercase tracking-tight text-organic-dark">
+              {t('login_title')}
+            </h2>
+            <p className="text-sm font-bold text-organic-dark/40 uppercase tracking-widest">
+              {t('login_subtitle')}
+            </p>
           </div>
 
-          <div className="space-y-4">
-            <h2 className="text-4xl font-black text-organic-dark tracking-tighter uppercase">{t('login')}</h2>
-            <p className="text-organic-dark/40 font-bold uppercase tracking-widest text-xs">{t('hello_farmer')}</p>
-          </div>
-
-          {/* MongoDB Email/Password Login */}
-          <form onSubmit={handleMongoLogin} className="space-y-8">
-            <div className="space-y-6">
+          <form onSubmit={handleMongoLogin} className="space-y-6">
+            <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase tracking-widest text-organic-dark/40 ml-4">
                   {t('email_placeholder')}
@@ -253,32 +204,16 @@ export default function Login() {
 
             <button
               type="submit"
-              disabled={loading || googleLoading}
+              disabled={loading}
               className={cn(
                 "organic-btn w-full bg-organic-dark text-white flex items-center justify-center gap-3 shadow-2xl hover:bg-black",
-                (loading || googleLoading) && "opacity-70 pointer-events-none"
+                loading && "opacity-70 pointer-events-none"
               )}
             >
               {loading ? <Loader2 className="animate-spin" /> : <ArrowRight size={20} />}
               <span className="text-xl uppercase tracking-tighter">{t('login_btn')}</span>
             </button>
           </form>
-
-          <div className="relative py-4">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-organic-light" /></div>
-            <div className="relative flex justify-center"><span className="bg-[#FDFCFB] px-4 text-[10px] font-black text-organic-dark/20 tracking-[0.3em] uppercase">{t('or')}</span></div>
-          </div>
-
-          {/* Google Login */}
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
-            disabled={loading || googleLoading}
-            className="organic-btn w-full bg-white border border-organic-light text-organic-dark shadow-sm hover:bg-organic-light flex items-center justify-center gap-4 transition-all"
-          >
-            {googleLoading ? <Loader2 className="animate-spin text-organic-green" /> : <Chrome className="text-organic-green" size={24} />}
-            <span className="text-lg uppercase tracking-widest">{t('login_google')}</span>
-          </button>
 
           <div className="text-center space-y-4">
             <p className="text-sm font-bold text-organic-dark/40 uppercase tracking-widest">

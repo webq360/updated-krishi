@@ -11,16 +11,12 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { safeLocalStorage } from '../lib/storage';
-import { auth, db } from '../firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, getDocFromServer } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { cn } from '../lib/utils';
 import { useNotifications } from './NotificationManager';
 import { useWeather } from './WeatherContext';
 import { useTheme } from './ThemeContext';
 import VoiceAssistant from './VoiceAssistant';
-import { LoadingScreen } from './Loaders';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { t, i18n } = useTranslation();
@@ -37,112 +33,103 @@ export function Layout({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const isDesktop = windowWidth >= 768; // Changed from 1024 to 768 to include tablets
+  const isDesktop = windowWidth >= 768;
   const isMenuExpanded = isDesktop ? !isDesktopSidebarHidden : isSidebarOpen;
   const [user, setUser] = useState<any>(null);
   const [dbStatus, setDbStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [showConnError, setShowConnError] = useState(false);
-  const retryCountRef = useRef(0);
   const location = useLocation();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
 
+  // Sync user state from localStorage and MongoDB
   useEffect(() => {
-    if (safeLocalStorage.getItem('isAdmin') === 'true') {
-      setIsAdmin(true);
-    }
-  }, []);
+    const loadUser = async () => {
+      const userStr = safeLocalStorage.getItem('user');
+      const authToken = safeLocalStorage.getItem('authToken');
 
+      if (userStr) {
+        try {
+          const parsed = JSON.parse(userStr);
+          setUser(parsed);
+          setUserProfile(parsed);
+          if (parsed.role === 'admin' || safeLocalStorage.getItem('isAdmin') === 'true') {
+            setIsAdmin(true);
+          }
+        } catch {}
+      }
+
+      if (authToken) {
+        try {
+          const res = await fetch('/api/auth/me', {
+            headers: { 'Authorization': `Bearer ${authToken}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setUser(data);
+            setUserProfile(data);
+            setIsAdmin(data.role === 'admin');
+            safeLocalStorage.setItem('user', JSON.stringify(data));
+            if (data.role === 'admin') safeLocalStorage.setItem('isAdmin', 'true');
+          }
+        } catch {}
+      }
+    };
+
+    loadUser();
+  }, [location.pathname]);
+
+  // MongoDB connection check via health API
   useEffect(() => {
-    let retryTimer: any;
     let isMounted = true;
-    
-    const testConnection = async () => {
-      if (!isMounted) return;
+
+    const checkHealth = async () => {
       try {
-        const docRef = doc(db, '_connection_test_', 'ping');
-        await getDocFromServer(docRef);
+        const res = await fetch('/api/health');
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted) {
+            if (data.mongodb === 'connected') {
+              setDbStatus('connected');
+              setShowConnError(false);
+            } else {
+              setDbStatus('error');
+              setShowConnError(true);
+            }
+          }
+        }
+      } catch (err) {
         if (isMounted) {
-          setDbStatus('connected');
-          setShowConnError(false);
-          retryCountRef.current = 0;
-        }
-      } catch (error: any) {
-        if (!isMounted) return;
-        const isPermissionError = error?.code === 'permission-denied' || 
-                                 error?.message?.toLowerCase().includes('permission-denied');
-        if (isPermissionError) {
-          setDbStatus('connected');
-          setShowConnError(false);
-          return;
-        }
-        retryCountRef.current += 1;
-        if (retryCountRef.current >= 2) {
           setDbStatus('error');
           setShowConnError(true);
         }
-        retryTimer = setTimeout(testConnection, 10000);
       }
     };
 
-    testConnection();
-    window.addEventListener('online', testConnection);
-    window.addEventListener('offline', () => setDbStatus('error'));
+    checkHealth();
+    const interval = setInterval(checkHealth, 30000);
 
     return () => {
       isMounted = false;
-      clearTimeout(retryTimer);
-      window.removeEventListener('online', testConnection);
+      clearInterval(interval);
     };
-  }, []);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
-      if (user) {
-        let isUserAdmin = user.email === 'admin@farmexagro.com' || user.email === 'absfeed.info@gmail.com';
-        try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (userDoc.exists()) {
-            const profile = userDoc.data();
-            setUserProfile(profile);
-            if (profile.role === 'admin') isUserAdmin = true;
-          }
-        } catch (err) {}
-        setIsAdmin(isUserAdmin);
-        if (isUserAdmin) safeLocalStorage.setItem('isAdmin', 'true');
-      } else {
-        setIsAdmin(false);
-        setUserProfile(null);
-        safeLocalStorage.removeItem('isAdmin');
-      }
-    });
-    return () => unsub();
   }, []);
 
   useEffect(() => {
     refreshWeather(userProfile?.address || 'Dhaka');
   }, [userProfile?.address]);
 
-  const handleLogout = async () => {
-    // Firebase logout
-    try {
-      await signOut(auth);
-    } catch (err) {
-      console.error('Firebase logout error:', err);
-    }
-
-    // MongoDB logout - clear tokens
+  const handleLogout = () => {
     safeLocalStorage.removeItem('authToken');
     safeLocalStorage.removeItem('user');
     safeLocalStorage.removeItem('loginMethod');
-    
-    // Legacy logout
     safeLocalStorage.removeItem('isAdmin');
     safeLocalStorage.removeItem('isUser');
-    
+    setUser(null);
+    setUserProfile(null);
+    setIsAdmin(false);
     navigate('/login');
   };
 
@@ -203,8 +190,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     {isMenuExpanded ? <X size={18} className="sm:w-6 sm:h-6" /> : <Menu size={18} className="sm:w-6 sm:h-6" />}
                 </motion.button>
                 <Link to="/" className="flex items-center gap-2 sm:gap-4 group">
-                    <div className="w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center overflow-hidden rounded-xl bg-organic-green">
-                        <img src="/logo.png" className="w-full h-full object-cover" alt="Logo" referrerPolicy="no-referrer" />
+                    <div className="w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center overflow-hidden rounded-xl bg-transparent">
+                        <img src="/krishi_logo.png" className="w-full h-full object-contain" alt="Logo" referrerPolicy="no-referrer" />
                     </div>
                     <div className="flex flex-col justify-center">
                         <span className="text-xl sm:text-3xl font-black uppercase text-organic-dark dark:text-white leading-none tracking-tighter">{t('app_name')}</span>
@@ -217,7 +204,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-1 sm:gap-4">
                 <button onClick={toggleTheme} className="p-1.5 sm:p-3 bg-organic-light dark:bg-dark-surface rounded-xl"><Moon size={16} /></button>
                 <button onClick={() => i18n.changeLanguage(i18n.language === 'en' ? 'bn' : 'en')} className="p-1.5 sm:p-3 bg-organic-light dark:bg-dark-surface rounded-xl"><Languages size={16} /></button>
-                <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="p-1.5 sm:p-3 bg-organic-light dark:bg-dark-surface rounded-xl"><Bell size={16} /></button>
+                <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="p-1.5 sm:p-3 bg-organic-light dark:bg-dark-surface rounded-xl relative">
+                  <Bell size={16} />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                  )}
+                </button>
             </div>
           </nav>
           
@@ -226,9 +218,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
             isDesktop ? (isDesktopSidebarHidden ? "-translate-x-full" : "translate-x-0") : (isSidebarOpen ? "translate-x-0" : "-translate-x-full")
           )}>
             <div className="flex flex-col h-full px-6 overflow-y-auto no-scrollbar relative">
-                {/* Sidebar Header - More Compact */}
+                {/* Sidebar Header */}
                 <div className="py-6 border-b border-organic-green/5 mb-4 flex flex-col items-center text-center relative">
-                    {/* PC/Tablet/Mobile Close Button */}
                     <button 
                         onClick={() => isDesktop ? setIsDesktopSidebarHidden(true) : setIsSidebarOpen(false)}
                         className="absolute top-0 right-0 p-2 text-gray-400 hover:text-organic-green transition-all hover:scale-110"
@@ -237,8 +228,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         <X size={18} />
                     </button>
                     
-                    <div className="w-20 h-20 mb-3 rounded-2xl overflow-hidden bg-organic-green">
-                        <img src="/logo.png" className="w-full h-full object-cover" alt="Krishi Bondhu" referrerPolicy="no-referrer" />
+                    <div className="w-20 h-20 mb-3 rounded-2xl overflow-hidden bg-transparent flex items-center justify-center">
+                        <img src="/krishi_logo.png" className="w-full h-full object-contain" alt="Krishi Bondhu" referrerPolicy="no-referrer" />
                     </div>
                     
                     <div className="flex flex-col items-center">
@@ -274,7 +265,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <span className="text-xs font-black uppercase text-purple-600">{t('admin_panel')}</span>
                         </Link>
                     )}
-                    <button key="sidebar-nav-logout" onClick={handleLogout} className="flex items-center gap-4 px-5 py-3 rounded-2xl text-red-500 hover:bg-red-50 transition-colors">
+                    <button key="sidebar-nav-logout" onClick={handleLogout} className="flex items-center gap-4 px-5 py-3 rounded-2xl text-red-500 hover:bg-red-50 transition-colors w-full text-left">
                         <LogOut size={18} />
                         <span className="text-xs font-black uppercase">{t('logout')}</span>
                     </button>

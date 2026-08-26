@@ -3,8 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 import { CloudRain, CloudLightning, Sun, Wind, Thermometer, AlertTriangle, Info, MapPin, RefreshCw, Loader2, Cloud, Droplets, ArrowRight, Navigation } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { auth, db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { auth, db, doc, getDoc } from '../lib/db';
 
 import { BANGLADESH_DISTRICTS, DISTRICT_UPAZILAS } from '../constants/districts';
 
@@ -19,7 +18,8 @@ export default function WeatherAlerts() {
   useEffect(() => {
     const fetchProfile = async () => {
       if (auth.currentUser) {
-        const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        const uid = auth.currentUser.id || auth.currentUser.uid || auth.currentUser._id;
+        const userDoc = await getDoc(doc(db, 'users', uid));
         if (userDoc.exists()) {
           const profile = userDoc.data();
           setUserProfile(profile);

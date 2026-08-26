@@ -19,11 +19,10 @@ import {
   Image as ImageIcon,
   Loader2
 } from 'lucide-react';
-import { db, auth } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db, auth, collection, addDoc, serverTimestamp } from '../lib/db';
 import { cn } from '../lib/utils';
 import { BANGLADESH_DISTRICTS, DISTRICT_UPAZILAS } from '../constants/districts';
-import { compressBase64 } from '../lib/imageUtils';
+import { compressBase64, uploadToCloudinary } from '../lib/imageUtils';
 
 const KrishiProshikkhon = () => {
   const { t, i18n } = useTranslation();
@@ -43,28 +42,20 @@ const KrishiProshikkhon = () => {
     agentId: ''
   });
 
-  const handleNidUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'front' | 'back') => {
+  const handleNidUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'front' | 'back') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setVerifying(prev => ({ ...prev, [type]: true }));
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      try {
-        const compressed = await compressBase64(base64, 400, 400, 0.3);
-        setTimeout(() => {
-          if (type === 'front') setNidFront(compressed);
-          else setNidBack(compressed);
-          setVerifying(prev => ({ ...prev, [type]: false }));
-        }, 1500);
-      } catch (err) {
-        if (type === 'front') setNidFront(base64);
-        else setNidBack(base64);
-        setVerifying(prev => ({ ...prev, [type]: false }));
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const url = await uploadToCloudinary(file, 'krishi-training');
+      if (type === 'front') setNidFront(url);
+      else setNidBack(url);
+    } catch (err) {
+      console.error("Training NID upload error:", err);
+    } finally {
+      setVerifying(prev => ({ ...prev, [type]: false }));
+    }
   };
 
   const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {

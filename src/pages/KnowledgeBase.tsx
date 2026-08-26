@@ -5,8 +5,7 @@ import {
   CornerDownRight, Lightbulb, ShieldCheck, 
   Sprout, Bug, Zap, Save, CheckCircle2, Clock
 } from 'lucide-react';
-import { db } from '../firebase';
-import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
+import { db, collection, query, onSnapshot, orderBy } from '../lib/db';
 import { useTranslation } from 'react-i18next';
 import { safeLocalStorage } from '../lib/storage';
 

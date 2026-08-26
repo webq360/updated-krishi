@@ -12,8 +12,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useState, useEffect } from 'react';
-import { auth, db } from '../firebase';
-import { doc, getDoc, collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { auth, db, doc, getDoc, collection, query, where, orderBy, limit, onSnapshot } from '../lib/db';
 import { useWeather } from '../components/WeatherContext';
 import { safeLocalStorage } from '../lib/storage';
 
@@ -36,7 +35,7 @@ export default function Home() {
       return;
     }
 
-    const uid = auth.currentUser.uid;
+    const uid = auth.currentUser.id || auth.currentUser.uid || auth.currentUser._id;
 
     const unsubLoan = onSnapshot(
       query(collection(db, 'loanApplications'), where('userId', '==', uid), orderBy('createdAt', 'desc'), limit(1)),

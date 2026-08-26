@@ -18,12 +18,10 @@ import {
   VolumeX,
   Phone
 } from 'lucide-react';
-import { auth, db } from '../firebase';
-import { collection, addDoc, serverTimestamp, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { auth, db, collection, addDoc, serverTimestamp, query, where, orderBy, limit, onSnapshot, handleFirestoreError, OperationType } from '../lib/db';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { compressBase64 } from '../lib/imageUtils';
-import { handleFirestoreError, OperationType } from '../firebase';
 
 interface Log {
   id: string;
@@ -434,7 +432,7 @@ export default function ProblemSolver() {
                 >
                   <p className="text-sm font-medium line-clamp-1 group-hover:text-[#4CAF50]">{log.problem}</p>
                   <p className="text-xs text-[#8BA88B] mt-1">
-                    {log.timestamp?.toDate().toLocaleDateString()}
+                    {log.timestamp?.toDate ? log.timestamp.toDate().toLocaleDateString() : (log.timestamp ? new Date(log.timestamp).toLocaleDateString() : 'Recent')}
                   </p>
                 </button>
               )) : (

@@ -3,9 +3,7 @@ import { motion } from 'motion/react';
 import { TrendingUp, TrendingDown, Search, MapPin, Calendar, RefreshCw, Sparkles, Loader2, Plus, User, FileImage, Image as ImageIcon, CheckCircle2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { BANGLADESH_DISTRICTS, DISTRICT_UPAZILAS } from '../constants/districts';
-import { collection, onSnapshot, query, updateDoc, doc, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
-import { db, auth } from '../firebase';
-import { handleFirestoreError, OperationType } from '../firebase';
+import { db, auth, collection, onSnapshot, query, updateDoc, doc, addDoc, serverTimestamp, orderBy, handleFirestoreError, OperationType } from '../lib/db';
 
 export default function MarketPrice() {
   const { t, i18n } = useTranslation();
@@ -32,48 +30,34 @@ export default function MarketPrice() {
     date: new Date().toISOString().split('T')[0]
   });
 
-  const handleNidFrontUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNidFrontUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setVerifying(prev => ({ ...prev, front: true }));
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      try {
-        const { compressBase64 } = await import('../lib/imageUtils');
-        const compressed = await compressBase64(base64, 400, 400, 0.2);
-        setTimeout(() => {
-          setNidFront(compressed);
-          setVerifying(prev => ({ ...prev, front: false }));
-        }, 1500);
-      } catch (err) {
-        setNidFront(base64);
-        setVerifying(prev => ({ ...prev, front: false }));
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const { uploadToCloudinary } = await import('../lib/imageUtils');
+      const url = await uploadToCloudinary(file, 'krishi-market');
+      setNidFront(url);
+    } catch (err) {
+      console.error("Market NID upload error:", err);
+    } finally {
+      setVerifying(prev => ({ ...prev, front: false }));
+    }
   };
 
-  const handleNidBackUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNidBackUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setVerifying(prev => ({ ...prev, back: true }));
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      try {
-        const { compressBase64 } = await import('../lib/imageUtils');
-        const compressed = await compressBase64(base64, 400, 400, 0.2);
-        setTimeout(() => {
-          setNidBack(compressed);
-          setVerifying(prev => ({ ...prev, back: false }));
-        }, 1500);
-      } catch (err) {
-        setNidBack(base64);
-        setVerifying(prev => ({ ...prev, back: false }));
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const { uploadToCloudinary } = await import('../lib/imageUtils');
+      const url = await uploadToCloudinary(file, 'krishi-market');
+      setNidBack(url);
+    } catch (err) {
+      console.error("Market NID upload error:", err);
+    } finally {
+      setVerifying(prev => ({ ...prev, back: false }));
+    }
   };
 
   const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {

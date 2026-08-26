@@ -4,9 +4,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { TestTube, Calculator, Info, CheckCircle2, AlertCircle, RefreshCw, Sprout, FlaskConical, Cpu, Droplets, Thermometer, Activity, Camera, Send } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-import { db, auth } from '../firebase';
-import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
-import { compressBase64 } from '../lib/imageUtils';
+import { db, auth, collection, addDoc, serverTimestamp, query, where, getDocs } from '../lib/db';
+import { compressBase64, uploadToCloudinary } from '../lib/imageUtils';
 
 export default function SoilHealth() {
   const { t, i18n } = useTranslation();
@@ -47,20 +46,20 @@ export default function SoilHealth() {
     }
   };
 
-  const handleNidUpload = (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
+  const handleNidUpload = async (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
     const file = e.target.files?.[0];
     if (!file) return;
     
     setIsCompressing(true);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      const compressed = await compressBase64(base64, 300, 300, 0.2);
-      if (side === 'front') setNidFront(compressed);
-      else setNidBack(compressed);
+    try {
+      const url = await uploadToCloudinary(file, 'krishi-soil');
+      if (side === 'front') setNidFront(url);
+      else setNidBack(url);
+    } catch (err) {
+      console.error("Soil NID upload error:", err);
+    } finally {
       setIsCompressing(false);
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const handleRequestSubmit = async (e: React.FormEvent) => {

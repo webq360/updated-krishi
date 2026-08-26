@@ -3,11 +3,10 @@ import { motion } from 'motion/react';
 import { Send, MapPin, Phone, User, CreditCard, Info, CheckCircle2, Landmark, FileImage, Image as ImageIcon, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 import { BANGLADESH_DISTRICTS, DISTRICT_UPAZILAS } from '../constants/districts';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { db, auth, collection, addDoc, serverTimestamp } from '../lib/db';
 import { useNavigate } from 'react-router-dom';
 
-import { compressBase64 } from '../lib/imageUtils';
+import { compressBase64, uploadToCloudinary } from '../lib/imageUtils';
 
 export default function CardApplication() {
   const { i18n } = useTranslation();
@@ -36,8 +35,8 @@ export default function CardApplication() {
     }
     setIsSearchingAgent(true);
     try {
-      const { getDocs, query, where } = await import('firebase/firestore');
-      const q = query(collection(db, 'agents'), where('agentId', '==', id.toUpperCase()), where('status', '!=', 'suspended'));
+      const { getDocs, query, where } = await import('../lib/db');
+      const q = query(collection(db, 'agents'), where('agentId', '==', id.toUpperCase()));
       const snap = await getDocs(q);
       if (!snap.empty) {
         setAgentDetails(snap.docs[0].data());
@@ -51,28 +50,20 @@ export default function CardApplication() {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'front' | 'back') => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'front' | 'back') => {
     const file = e.target.files?.[0];
     if (!file) return;
     
     setVerifying(prev => ({ ...prev, [field]: true }));
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      try {
-        const compressed = await compressBase64(base64, 300, 300, 0.2);
-        setTimeout(() => {
-          if (field === 'front') setNidFront(compressed);
-          else setNidBack(compressed);
-          setVerifying(prev => ({ ...prev, [field]: false }));
-        }, 1500);
-      } catch (err) {
-        if (field === 'front') setNidFront(base64);
-        else setNidBack(base64);
-        setVerifying(prev => ({ ...prev, [field]: false }));
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const uploadedUrl = await uploadToCloudinary(file, 'krishi-nid');
+      if (field === 'front') setNidFront(uploadedUrl);
+      else setNidBack(uploadedUrl);
+    } catch (err) {
+      console.error("NID upload error:", err);
+    } finally {
+      setVerifying(prev => ({ ...prev, [field]: false }));
+    }
   };
 
   const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -98,6 +89,8 @@ export default function CardApplication() {
     // }
 
     setIsSubmitting(true);
+    const user = auth.currentUser;
+    const uid = (user as any).id || user.uid || (user as any)._id;
     try {
       await addDoc(collection(db, 'cardApplications'), {
         ...form,
@@ -105,7 +98,7 @@ export default function CardApplication() {
         nidBack,
         referredByAgentId: form.agentId || null,
         referredByAgentName: agentDetails?.name || null,
-        userId: auth.currentUser.uid,
+        userId: uid,
         status: 'pending',
         createdAt: serverTimestamp()
       });

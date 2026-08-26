@@ -3,8 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { MapPin, Phone, Plus, Search, Tractor, Hammer, Info, CheckCircle2, User, FileImage, Image as ImageIcon, CreditCard, ShieldCheck, X, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { BANGLADESH_DISTRICTS, DISTRICT_UPAZILAS } from '../constants/districts';
-import { collection, addDoc, serverTimestamp, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { db, auth, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy } from '../lib/db';
 import { cn } from '../lib/utils';
 
 export default function RentMachine() {
@@ -28,38 +27,33 @@ export default function RentMachine() {
     agentId: ''
   });
 
-  const handleNidUpload = (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
+  const handleNidUpload = async (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
     const file = e.target.files?.[0];
     if (!file) return;
     
     setVerifying(prev => ({ ...prev, [side]: true }));
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      try {
-        const { compressBase64 } = await import('../lib/imageUtils');
-        const compressed = await compressBase64(base64, 300, 300, 0.2);
-        
-        setTimeout(() => {
-          if (side === 'front') setNidFront(compressed);
-          else setNidBack(compressed);
-          setVerifying(prev => ({ ...prev, [side]: false }));
-        }, 1500);
-      } catch (err) {
-        if (side === 'front') setNidFront(base64);
-        else setNidBack(base64);
-        setVerifying(prev => ({ ...prev, [side]: false }));
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const { uploadToCloudinary } = await import('../lib/imageUtils');
+      const url = await uploadToCloudinary(file, 'krishi-machinery');
+      if (side === 'front') setNidFront(url);
+      else setNidBack(url);
+    } catch (err) {
+      console.error("Machine NID upload error:", err);
+    } finally {
+      setVerifying(prev => ({ ...prev, [side]: false }));
+    }
   };
 
-  const handleMachinePicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMachinePicUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => setMachinePic(event.target?.result as string);
-    reader.readAsDataURL(file);
+    try {
+      const { uploadToCloudinary } = await import('../lib/imageUtils');
+      const url = await uploadToCloudinary(file, 'krishi-machinery');
+      setMachinePic(url);
+    } catch (err) {
+      console.error("Machine photo upload error:", err);
+    }
   };
 
   const currentUpazilas = DISTRICT_UPAZILAS[form.district] || [];

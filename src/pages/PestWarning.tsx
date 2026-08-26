@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'motion/react';
 import { AlertTriangle, MapPin, Calendar, Info, ShieldAlert, Loader2 } from 'lucide-react';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, collection, onSnapshot, query, orderBy } from '../lib/db';
 import { cn } from '../lib/utils';
 
 export default function PestWarning() {
@@ -97,7 +96,7 @@ export default function PestWarning() {
             <div className="flex items-center justify-between pt-2">
               <div className="flex items-center gap-2 text-[10px] text-[#8BA88B] dark:text-gray-500 font-bold uppercase">
                 <Calendar size={12} />
-                {warning.createdAt?.toDate().toLocaleDateString()}
+                {warning.createdAt?.toDate ? warning.createdAt.toDate().toLocaleDateString() : (warning.createdAt ? new Date(warning.createdAt).toLocaleDateString() : 'Recent')}
               </div>
               <button className="text-[10px] font-black text-[#4CAF50] uppercase tracking-widest hover:underline">
                 View Details

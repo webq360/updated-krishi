@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { auth, db } from '../firebase';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { OperationType, handleFirestoreError } from '../firebase';
+import { auth, db, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, OperationType, handleFirestoreError } from '../lib/db';
 import { motion, AnimatePresence } from 'motion/react';
 import { safeLocalStorage } from '../lib/storage';
 import { 
@@ -99,34 +97,36 @@ export default function AdminPanel() {
   const [isAdding, setIsAdding] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
 
+  const isBn = i18n.language !== 'en';
+
   const categories = [
     {
       id: 'overview',
-      label: 'Overview',
+      label: isBn ? 'ওভারভিউ (সারসংক্ষেপ)' : 'Overview',
       icon: Activity,
       tabs: ['online', 'problems', 'stories']
     },
     {
       id: 'users',
-      label: 'User Management',
+      label: isBn ? 'ইউজার ম্যানেজমেন্ট' : 'User Management',
       icon: Users,
       tabs: ['users', 'settings']
     },
     {
       id: 'applications',
-      label: 'Applications',
+      label: isBn ? 'আবেদনসমূহ' : 'Applications',
       icon: Landmark,
       tabs: ['loans', 'loan-payments', 'protections', 'protection-updates', 'pona', 'training', 'exports', 'cards', 'agents']
     },
     {
       id: 'services',
-      label: 'Services Management',
+      label: isBn ? 'সেবা ব্যবস্থাপনা' : 'Services Management',
       icon: Database,
       tabs: ['cold-storage', 'rent-machines', 'pest-warnings', 'seed-bank', 'soil-test', 'livestock-health', 'fish-water-test', 'map-resources', 'knowledge-base', 'video-tutorials', 'system-push']
     },
     {
       id: 'content',
-      label: 'Content Edit',
+      label: isBn ? 'কন্টেন্ট এডিট' : 'Content Edit',
       icon: Edit2,
       tabs: ['species', 'diseases', 'products', 'market', 'user-market', 'calendar', 'marketplace', 'forum']
     }
@@ -134,70 +134,103 @@ export default function AdminPanel() {
 
   const getTabLabel = (tab: string) => {
     switch(tab) {
-      case 'species': return t('livestock');
-      case 'diseases': return t('diseases');
-      case 'products': return t('our_products');
-      case 'market': return 'Admin Market Prices';
-      case 'user-market': return 'User Market Prices';
-      case 'calendar': return 'Crop Calendar';
-      case 'marketplace': return 'Marketplace';
-      case 'forum': return 'Forum';
-      case 'users': return 'User Data';
-      case 'online': return 'Live Monitor';
-      case 'stories': return 'Success Stories';
-      case 'problems': return 'Problem Logs';
-      case 'loans': return 'Loan Apps';
-      case 'loan-payments': return 'Loan Installments';
-      case 'protections': return 'Protection Apps';
-      case 'protection-updates': return 'Protection Updates';
-      case 'pona': return 'Pona Orders';
-      case 'training': return 'Training Apps';
-      case 'exports': return 'Export Apps';
-      case 'cards': return t('bondhu_card');
-      case 'agents': return t('agent_registration');
-      case 'cold-storage': return 'Cold Storage';
-      case 'rent-machines': return 'Rent Machines';
-      case 'pest-warnings': return 'Pest Warnings';
-      case 'seed-bank': return 'Seed Bank';
-      case 'livestock-health': return 'Livestock Health';
-      case 'fish-water-test': return 'Fish Water Tests';
-      case 'map-resources': return t('resource_map');
-      case 'knowledge-base': return t('knowledge_base');
-      case 'video-tutorials': return 'Video Tutorials';
-      case 'system-push': return 'Global Notifications';
-      case 'settings': return 'Role Settings';
+      case 'species': return isBn ? 'গবাদিপশু ও ফসল গাইড' : 'Species & Crops';
+      case 'diseases': return isBn ? 'রোগ ও প্রতিকার' : 'Diseases & Remedies';
+      case 'products': return isBn ? 'কোম্পানি প্রোডাক্টস' : 'ABS Products';
+      case 'market': return isBn ? 'অ্যাডমিন বাজার দর' : 'Admin Market Prices';
+      case 'user-market': return isBn ? 'কৃষকের বাজার দর' : 'User Market Prices';
+      case 'calendar': return isBn ? 'ফসল ক্যালেন্ডার' : 'Crop Calendar';
+      case 'marketplace': return isBn ? 'কৃষক বাজার (বিজ্ঞাপন)' : 'Marketplace Ads';
+      case 'forum': return isBn ? 'কমিউনিটি ফোরাম' : 'Community Forum';
+      case 'users': return isBn ? 'ইউজার তালিকা' : 'User Accounts';
+      case 'online': return isBn ? 'লাইভ অনলাইন মনিটর' : 'Live Monitor';
+      case 'stories': return isBn ? 'সাফল্যের গল্প' : 'Success Stories';
+      case 'problems': return isBn ? 'কৃষক সমস্যা লগ' : 'Problem Logs';
+      case 'loans': return isBn ? 'বন্ধু ঋণ আবেদন' : 'Loan Applications';
+      case 'loan-payments': return isBn ? 'ঋণের কিস্তি জমা' : 'Loan Installments';
+      case 'protections': return isBn ? 'সুরক্ষা বীমা আবেদন' : 'Suraksha Protection Apps';
+      case 'protection-updates': return isBn ? 'বীমা ক্লেইম আপডেট' : 'Protection Updates';
+      case 'pona': return isBn ? 'পোনা ও চারা অর্ডার' : 'Pona & Seedling Orders';
+      case 'training': return isBn ? 'কৃষি প্রশিক্ষণ আবেদন' : 'Training Applications';
+      case 'exports': return isBn ? 'রপ্তানি আবেদন' : 'Export Applications';
+      case 'cards': return isBn ? 'কিষাণ ডিজিটাল কার্ড' : 'Bondhu Digital Cards';
+      case 'agents': return isBn ? 'এজেন্ট আবেদন ও অনুমোদন' : 'Agent Applications';
+      case 'cold-storage': return isBn ? 'কোল্ড স্টোরেজ' : 'Cold Storage';
+      case 'rent-machines': return isBn ? 'ভাড়ায় কৃষি যন্ত্র' : 'Rent Machinery';
+      case 'pest-warnings': return isBn ? 'পোকামাকড় সতর্কতা' : 'Pest Warnings';
+      case 'seed-bank': return isBn ? 'ঐতিহ্যবাহী বীজ ব্যাংক' : 'Seed Bank';
+      case 'soil-test': return isBn ? 'মাটি পরীক্ষা সেবা' : 'Soil Health Tests';
+      case 'livestock-health': return isBn ? 'প্রাণী স্বাস্থ্য সেবা' : 'Livestock Health';
+      case 'fish-water-test': return isBn ? 'পুকুরের পানি পরীক্ষা' : 'Fish Water Tests';
+      case 'map-resources': return isBn ? 'রিসোর্স ম্যাপ ও ডিলার' : 'Resource Map';
+      case 'knowledge-base': return isBn ? 'কৃষি তথ্য ভাণ্ডার' : 'Knowledge Base';
+      case 'video-tutorials': return isBn ? 'ভিডিও টিউটোরিয়াল' : 'Video Tutorials';
+      case 'system-push': return isBn ? 'গ্লোবাল পুশ নোটিফিকেশন' : 'Push Notifications';
+      case 'settings': return isBn ? 'অ্যাডমিন রোল ও পারমিশন' : 'Role & Admin Settings';
       default: return tab;
     }
   };
 
+  const formatCellValue = (val: any) => {
+    if (val === null || val === undefined) return '';
+    if (typeof val === 'object') {
+      if (val.en || val.bn) return val.bn || val.en;
+      if (Array.isArray(val)) return val.join(', ');
+      return JSON.stringify(val);
+    }
+    return String(val);
+  };
+
   const exportToPDF = () => {
-    const doc = new jsPDF() as any;
     const data = getActiveTabData();
-    if (data.length === 0) return;
+    if (!data || data.length === 0) {
+      alert(i18n.language === 'en' ? 'No data available to export.' : 'এক্সপোর্ট করার মতো কোনো তথ্য নেই।');
+      return;
+    }
 
-    const headers = Object.keys(data[0]).filter(k => k !== 'id' && k !== 'imageUrl' && k !== 'createdAt');
-    const rows = data.map(item => headers.map(h => String(item[h] || '')));
+    try {
+      const doc = new jsPDF() as any;
+      const headers = Object.keys(data[0]).filter(k => k !== 'id' && k !== 'imageUrl' && k !== 'createdAt' && k !== 'password');
+      const rows = data.map(item => headers.map(h => formatCellValue(item[h])));
 
-    doc.text(`${getTabLabel(activeTab)} Report`, 14, 15);
-    doc.autoTable({
-      head: [headers.map(h => h.toUpperCase())],
-      body: rows,
-      startY: 20,
-      theme: 'grid',
-      styles: { fontSize: 8 }
-    });
-    doc.save(`${activeTab}_report.pdf`);
+      doc.text(`${getTabLabel(activeTab)} Report`, 14, 15);
+      doc.autoTable({
+        head: [headers.map(h => h.toUpperCase())],
+        body: rows,
+        startY: 20,
+        theme: 'grid',
+        styles: { fontSize: 8 }
+      });
+      doc.save(`${activeTab}_report.pdf`);
+    } catch (err) {
+      console.error("PDF export error:", err);
+      alert("Failed to export PDF.");
+    }
   };
 
   const exportToExcel = () => {
     const data = getActiveTabData();
-    if (data.length === 0) return;
+    if (!data || data.length === 0) {
+      alert(i18n.language === 'en' ? 'No data available to export.' : 'এক্সপোর্ট করার মতো কোনো তথ্য নেই।');
+      return;
+    }
     
-    const cleanData = data.map(({ id, imageUrl, createdAt, ...rest }) => rest);
-    const ws = XLSX.utils.json_to_sheet(cleanData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Report");
-    XLSX.writeFile(wb, `${activeTab}_report.xlsx`);
+    try {
+      const cleanData = data.map(({ id, imageUrl, createdAt, password, ...rest }) => {
+        const row: any = {};
+        for (const [k, v] of Object.entries(rest)) {
+          row[k] = formatCellValue(v);
+        }
+        return row;
+      });
+      const ws = XLSX.utils.json_to_sheet(cleanData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Report");
+      XLSX.writeFile(wb, `${activeTab}_report.xlsx`);
+    } catch (err) {
+      console.error("Excel export error:", err);
+      alert("Failed to export Excel.");
+    }
   };
 
   const filterData = (data: any[]) => {
@@ -870,7 +903,8 @@ export default function AdminPanel() {
       if (editingItem) {
         await updateDoc(doc(db, collectionName, editingItem.id), data);
       } else {
-        const uid = auth.currentUser?.uid;
+        const user = auth.currentUser;
+        const uid = user?.id || user?.uid || user?._id;
         const finalData = { ...data };
         
         // Inject userId for collections that require it
@@ -963,8 +997,12 @@ export default function AdminPanel() {
       <div className="w-full md:w-72 shrink-0 space-y-6">
         <div className="bg-white rounded-[2rem] border border-[#E0E8E0] p-4 shadow-sm">
           <div className="p-4 mb-4">
-            <h1 className="text-2xl font-black text-[#1B301B] uppercase tracking-tight">Admin <span className="text-[#4CAF50]">Hub</span></h1>
-            <p className="text-xs text-[#8BA88B] font-bold uppercase tracking-widest mt-1">Management Console</p>
+            <h1 className="text-2xl font-black text-[#1B301B] uppercase tracking-tight">
+              {isBn ? 'অ্যাডমিন' : 'Admin'} <span className="text-[#4CAF50]">{isBn ? 'হাব' : 'Hub'}</span>
+            </h1>
+            <p className="text-xs text-[#8BA88B] font-bold uppercase tracking-widest mt-1">
+              {isBn ? 'ম্যানেজমেন্ট কনসোল' : 'Management Console'}
+            </p>
           </div>
           
           <nav className="space-y-2">
@@ -1032,7 +1070,7 @@ export default function AdminPanel() {
               className="w-full flex items-center justify-center gap-2 p-4 bg-[#F0F5F0] text-[#2E7D32] rounded-2xl font-bold hover:bg-[#E8F5E9] transition-all text-sm disabled:opacity-50"
             >
               {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <Database size={16} />}
-              {t('admin_seed')}
+              {isBn ? 'ডাটাবেস সীড করুন' : t('admin_seed')}
             </button>
           </div>
         </div>
@@ -1040,15 +1078,27 @@ export default function AdminPanel() {
 
       {/* Main Content */}
       <div className="flex-1 space-y-8">
-        <header className="flex flex-col items-center text-center gap-4 bg-white p-8 rounded-[3rem] border border-[#E0E8E0] shadow-sm">
-          <div className="space-y-2">
-            <h2 className="text-4xl font-black text-[#1B301B] uppercase tracking-tight leading-none">{getTabLabel(activeTab)}</h2>
-            <p className="text-[#556B55] font-medium text-sm">Manage your {activeTab} data and system settings.</p>
+        <header className="flex flex-col sm:flex-row items-center justify-between text-left gap-4 bg-white p-8 rounded-[3rem] border border-[#E0E8E0] shadow-sm">
+          <div className="space-y-1 text-center sm:text-left">
+            <h2 className="text-3xl sm:text-4xl font-black text-[#1B301B] uppercase tracking-tight leading-none">{getTabLabel(activeTab)}</h2>
+            <p className="text-[#556B55] font-medium text-xs sm:text-sm">
+              {isBn ? `${getTabLabel(activeTab)} সম্পর্কিত তথ্য ও সিস্টেম ব্যবস্থাপনা।` : `Manage your ${getTabLabel(activeTab)} data and system settings.`}
+            </p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="px-5 py-2 bg-green-50 rounded-full border border-green-100 text-[10px] font-black uppercase tracking-[0.2em] text-[#2E7D32] flex items-center gap-2">
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Quick Language Toggle */}
+            <button
+              onClick={() => i18n.changeLanguage(i18n.language === 'en' ? 'bn' : 'en')}
+              className="flex items-center gap-2 px-4 py-2 bg-[#F0F5F0] hover:bg-[#E8F5E9] text-[#1B301B] border border-[#E0E8E0] rounded-full text-xs font-black transition-all shadow-sm"
+              title="Change Language"
+            >
+              <Globe size={14} className="text-[#4CAF50]" />
+              <span>{i18n.language === 'en' ? 'বাংলা' : 'English'}</span>
+            </button>
+
+            <div className="px-4 py-2 bg-green-50 rounded-full border border-green-100 text-[10px] font-black uppercase tracking-[0.2em] text-[#2E7D32] flex items-center gap-2">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              KGF Live Monitor
+              {isBn ? 'কেজিএফ লাইভ মনিটর' : 'KGF Live Monitor'}
             </div>
           </div>
         </header>
@@ -1060,7 +1110,7 @@ export default function AdminPanel() {
               <Activity size={24} />
             </div>
             <div>
-              <p className="text-sm text-[#556B55]">Currently Online</p>
+              <p className="text-sm text-[#556B55]">{isBn ? 'বর্তমানে অনলাইনে' : 'Currently Online'}</p>
               <h3 className="text-2xl font-bold">{onlineUsers.length}</h3>
             </div>
           </div>
@@ -1069,7 +1119,7 @@ export default function AdminPanel() {
               <Users size={24} />
             </div>
             <div>
-              <p className="text-sm text-[#556B55]">Total Registered</p>
+              <p className="text-sm text-[#556B55]">{isBn ? 'মোট নিবন্ধিত ইউজার' : 'Total Registered'}</p>
               <h3 className="text-2xl font-bold">{users.length}</h3>
             </div>
           </div>
@@ -1077,15 +1127,15 @@ export default function AdminPanel() {
       )}
 
       <div className="bg-white rounded-3xl border border-[#E0E8E0] shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-[#E0E8E0] flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-bold capitalize">{activeTab} List</h2>
+        <div className="p-6 border-b border-[#E0E8E0] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-4 w-full sm:w-auto">
+            <h2 className="text-xl font-bold">{getTabLabel(activeTab)} {isBn ? 'তালিকা' : 'List'}</h2>
             <div className="flex items-center gap-2">
               <div className="relative">
                 <Send size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8BA88B]" />
                 <input
                   type="text"
-                  placeholder={i18n.language === 'en' ? "Search by ID or Phone..." : "আইডি বা ফোন দিয়ে খুঁজুন..."}
+                  placeholder={isBn ? "আইডি, ফোন বা নাম দিয়ে খুঁজুন..." : "Search by ID, Phone, Name..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 pr-4 py-2 bg-[#F9FBF9] border border-[#E0E8E0] rounded-xl text-sm focus:ring-2 focus:ring-[#4CAF50] outline-none w-48 sm:w-64 transition-all"
@@ -1094,14 +1144,14 @@ export default function AdminPanel() {
               <button 
                 onClick={exportToPDF}
                 className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all"
-                title="Export to PDF"
+                title={isBn ? "পিডিএফ রিপোর্ট ডাউনলোড" : "Export to PDF"}
               >
                 <FileDown size={18} />
               </button>
               <button 
                 onClick={exportToExcel}
                 className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-all"
-                title="Export to Excel"
+                title={isBn ? "এক্সেল রিপোর্ট ডাউনলোড" : "Export to Excel"}
               >
                 <FileSpreadsheet size={18} />
               </button>
@@ -1113,10 +1163,10 @@ export default function AdminPanel() {
                 setIsAdding(true);
                 setEditingItem(null);
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-[#4CAF50] text-white rounded-xl font-bold hover:bg-[#43A047] transition-all"
+              className="flex items-center gap-2 px-5 py-2.5 bg-[#4CAF50] text-white rounded-xl font-bold hover:bg-[#43A047] transition-all text-sm shrink-0 shadow-lg shadow-green-900/20"
             >
-              <Plus size={20} />
-              {t('add_new')}
+              <Plus size={18} />
+              {isBn ? 'নতুন যোগ করুন' : t('add_new')}
             </button>
           )}
         </div>
@@ -1238,8 +1288,8 @@ export default function AdminPanel() {
                           });
 
                           // 2. Create/Update login credentials in 'agents' collection
-                          const { setDoc, doc: fireDoc } = await import('firebase/firestore');
-                          await setDoc(fireDoc(db, 'agents', a.userId), {
+                          const { setDoc } = await import('../lib/db');
+                          await setDoc(doc(db, 'agents', a.userId || a.id), {
                             ...a,
                             agentId: agentId,
                             password: password,
@@ -1411,7 +1461,9 @@ export default function AdminPanel() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <h4 className="font-bold text-lg">{story.userName}</h4>
-                      <span className="text-xs text-[#8BA88B]">{story.createdAt?.toDate ? story.createdAt.toDate().toLocaleString() : new Date(story.createdAt).toLocaleString()}</span>
+                      <span className="text-xs text-[#8BA88B]">
+                        {story.createdAt?.toDate ? story.createdAt.toDate().toLocaleString() : (story.createdAt ? new Date(story.createdAt).toLocaleString() : 'Just now')}
+                      </span>
                     </div>
                     <p className="text-[#556B55]">{story.content}</p>
                   </div>
@@ -1436,7 +1488,9 @@ export default function AdminPanel() {
                     <div className="flex items-center gap-2">
                       <Activity size={18} className="text-[#4CAF50]" />
                       <h4 className="font-bold text-lg">Problem Log</h4>
-                      <span className="text-xs text-[#8BA88B]">{problem.timestamp?.toDate ? problem.timestamp.toDate().toLocaleString() : new Date(problem.timestamp).toLocaleString()}</span>
+                      <span className="text-xs text-[#8BA88B]">
+                        {problem.timestamp?.toDate ? problem.timestamp.toDate().toLocaleString() : (problem.timestamp ? new Date(problem.timestamp).toLocaleString() : (problem.createdAt ? new Date(problem.createdAt).toLocaleString() : 'Recent'))}
+                      </span>
                     </div>
                     <div className="bg-red-50 p-4 rounded-2xl border border-red-100">
                       <p className="text-xs font-bold text-red-600 uppercase mb-1">Problem</p>

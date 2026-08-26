@@ -15,10 +15,9 @@ import {
   RefreshCw,
   Camera
 } from 'lucide-react';
-import { db, auth } from '../firebase';
-import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { db, auth, collection, addDoc, serverTimestamp, query, where, getDocs } from '../lib/db';
 import { cn } from '../lib/utils';
-import { compressBase64 } from '../lib/imageUtils';
+import { compressBase64, uploadToCloudinary } from '../lib/imageUtils';
 
 const PonaKroy = () => {
   const { t, i18n } = useTranslation();
@@ -59,20 +58,20 @@ const PonaKroy = () => {
     }
   };
 
-  const handleNidUpload = (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
+  const handleNidUpload = async (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
     const file = e.target.files?.[0];
     if (!file) return;
     
     setIsCompressing(true);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      const compressed = await compressBase64(base64, 300, 300, 0.2);
-      if (side === 'front') setNidFront(compressed);
-      else setNidBack(compressed);
+    try {
+      const url = await uploadToCloudinary(file, 'krishi-pona');
+      if (side === 'front') setNidFront(url);
+      else setNidBack(url);
+    } catch (err) {
+      console.error("Pona NID upload error:", err);
+    } finally {
       setIsCompressing(false);
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const categories = [

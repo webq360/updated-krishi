@@ -2,10 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 import { Calendar as CalendarIcon, Sprout, Droplets, Thermometer, Info, ChevronRight, X, Sparkles, Brain, Loader2, CheckCircle2 } from 'lucide-react';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, collection, onSnapshot, handleFirestoreError, OperationType } from '../lib/db';
 import { cn } from '../lib/utils';
-import { handleFirestoreError, OperationType } from '../firebase';
 
 export default function CropCalendar() {
   const { t, i18n } = useTranslation();

@@ -1,11 +1,15 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 export interface IUser extends Document {
   email: string;
   password: string;
+  name?: string;
   firstName?: string;
   lastName?: string;
+  phone?: string;
+  address?: string;
+  upazila?: string;
   role: 'user' | 'admin' | 'agent';
   isVerified: boolean;
   createdAt: Date;
@@ -20,34 +24,50 @@ const userSchema = new Schema<IUser>(
       required: true,
       unique: true,
       lowercase: true,
-      match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
+      trim: true,
     },
     password: {
       type: String,
       required: true,
       minlength: 6,
-      select: false // Don't include password by default
+      select: false, // Don't include password by default
+    },
+    name: {
+      type: String,
+      default: '',
     },
     firstName: {
       type: String,
-      default: ''
+      default: '',
     },
     lastName: {
       type: String,
-      default: ''
+      default: '',
+    },
+    phone: {
+      type: String,
+      default: '',
+    },
+    address: {
+      type: String,
+      default: '',
+    },
+    upazila: {
+      type: String,
+      default: '',
     },
     role: {
       type: String,
       enum: ['user', 'admin', 'agent'],
-      default: 'user'
+      default: 'user',
     },
     isVerified: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
   {
-    timestamps: true
+    timestamps: true,
   }
 );
 
@@ -71,6 +91,6 @@ userSchema.methods.comparePassword = async function (password: string): Promise<
   return bcrypt.compare(password, this.password);
 };
 
-const User = mongoose.model<IUser>('User', userSchema);
+const User: Model<IUser> = (mongoose.models.User as Model<IUser>) || mongoose.model<IUser>('User', userSchema);
 
 export default User;

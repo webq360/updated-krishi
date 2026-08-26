@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';
-import { handleFirestoreError, OperationType } from '../firebase';
+import { db, collection, onSnapshot, handleFirestoreError, OperationType } from '../lib/db';
 import { motion } from 'motion/react';
 import { ShoppingBag, ExternalLink, CheckCircle2 } from 'lucide-react';
 

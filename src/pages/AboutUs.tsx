@@ -11,23 +11,43 @@ export default function AboutUs() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [audioError, setAudioError] = useState(false);
 
-  // Original mission audio source
-  const AUDIO_URL = "https://krishibondhu.org.bd/audio/mission.mp3"; 
+  const [currentTime, setCurrentTime] = useState('0:00');
+  const [duration, setDuration] = useState('0:00');
+
+  // Static audio source from public/krishi_bondhu.mp3
+  const AUDIO_URL = "/krishi_bondhu.mp3"; 
+
+  const formatTime = (secs: number) => {
+    if (isNaN(secs) || secs === 0) return '0:00';
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
 
   const togglePlay = () => {
     if (audioRef.current) {
       if (isPlaying) {
         audioRef.current.pause();
+        setIsPlaying(false);
       } else {
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.error("Audio play failed:", error?.message || error);
-            setIsPlaying(false);
-          });
+          playPromise
+            .then(() => setIsPlaying(true))
+            .catch(error => {
+              console.error("Audio play failed:", error?.message || error);
+              setIsPlaying(false);
+            });
         }
       }
-      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (audioRef.current && audioRef.current.duration) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickPosition = (e.clientX - rect.left) / rect.width;
+      audioRef.current.currentTime = clickPosition * audioRef.current.duration;
     }
   };
 
@@ -36,19 +56,31 @@ export default function AboutUs() {
     if (!audio) return;
 
     const updateProgress = () => {
-      const currentProgress = (audio.currentTime / audio.duration) * 100;
-      setProgress(currentProgress);
+      if (audio.duration) {
+        const currentProgress = (audio.currentTime / audio.duration) * 100;
+        setProgress(currentProgress);
+        setCurrentTime(formatTime(audio.currentTime));
+      }
+    };
+
+    const handleLoadedMetadata = () => {
+      if (audio.duration) {
+        setDuration(formatTime(audio.duration));
+      }
     };
 
     const onEnded = () => {
       setIsPlaying(false);
       setProgress(0);
+      setCurrentTime('0:00');
     };
 
     audio.addEventListener('timeupdate', updateProgress);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('ended', onEnded);
     return () => {
       audio.removeEventListener('timeupdate', updateProgress);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('ended', onEnded);
     };
   }, []);
@@ -83,12 +115,13 @@ export default function AboutUs() {
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-center justify-center pt-4"
+              className="flex flex-col items-center justify-center pt-4"
             >
-              <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex items-center gap-4 w-full max-w-[340px] shadow-2xl relative">
+              <div className="bg-white/10 backdrop-blur-xl border border-white/15 rounded-3xl p-5 flex items-center gap-4 w-full max-w-[380px] shadow-2xl relative">
                 <button 
                   onClick={togglePlay}
-                  className="w-14 h-14 bg-organic-green rounded-xl flex items-center justify-center text-white shadow-xl shadow-organic-green/20 hover:scale-110 active:scale-90 transition-all shrink-0 z-10"
+                  className="w-14 h-14 bg-[#4CAF50] rounded-2xl flex items-center justify-center text-white shadow-xl shadow-green-900/30 hover:scale-105 active:scale-95 transition-all shrink-0 z-10"
+                  title={isPlaying ? "Pause Audio" : "Play Audio"}
                 >
                   {isPlaying ? (
                     <Pause size={24} fill="currentColor" />
@@ -100,49 +133,63 @@ export default function AboutUs() {
                 <div className="flex flex-col gap-2 flex-grow min-w-0">
                   <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-[0.2em] text-white">
                     <span className="truncate">
-                      {i18n.language === 'en' ? 'OUR MISSION' : 'আমাদের লক্ষ্য'}
+                      {i18n.language === 'en' ? 'Krishi Bondhu Audio' : 'কৃষি বন্ধু থিম অডিও'}
                     </span>
-                    {isPlaying && <span className="flex gap-0.5 items-center">
-                      {[0, 1, 2].map(i => (
-                        <motion.div 
-                          key={i}
-                          animate={{ height: [4, 12, 4] }}
-                          transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.2 }}
-                          className="w-1 bg-white rounded-full"
-                        />
-                      ))}
-                    </span>}
+                    {isPlaying && (
+                      <span className="flex gap-1 items-center">
+                        {[0, 1, 2, 3].map(i => (
+                          <motion.div 
+                            key={i}
+                            animate={{ height: [4, 14, 4] }}
+                            transition={{ repeat: Infinity, duration: 0.5, delay: i * 0.15 }}
+                            className="w-1 bg-[#4CAF50] rounded-full"
+                          />
+                        ))}
+                      </span>
+                    )}
                   </div>
-                  <div className="flex flex-col gap-0.5">
-                    <div className="h-2 bg-white/10 rounded-full overflow-hidden relative">
+
+                  <div className="flex flex-col gap-1">
+                    <div 
+                      onClick={handleSeek}
+                      className="h-2.5 bg-white/20 rounded-full overflow-hidden relative cursor-pointer group"
+                    >
                       <motion.div 
-                        className="h-full bg-organic-green relative" 
+                        className="h-full bg-[#4CAF50] relative" 
                         animate={{ width: `${progress}%` }}
                         transition={{ ease: "linear", duration: 0.1 }}
                       >
-                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-white rounded-full shadow-[0_0_10px_white]" />
+                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-[0_0_10px_white]" />
                       </motion.div>
                     </div>
-                    <div className="flex justify-between text-[8px] font-bold text-white/50 uppercase tracking-widest mt-1">
-                      <span>{isPlaying ? (i18n.language === 'en' ? 'Playing' : 'চলছে') : (i18n.language === 'en' ? 'Click to play' : 'শোনার জন্য ক্লিক করুন')}</span>
-                      <Volume2 size={10} className={isPlaying ? "text-organic-green" : ""} />
+                    <div className="flex justify-between text-[9px] font-bold text-white/70 uppercase tracking-widest mt-0.5">
+                      <span>{currentTime} / {duration}</span>
+                      <div className="flex items-center gap-1">
+                        <Volume2 size={11} className={isPlaying ? "text-[#4CAF50]" : "text-white/40"} />
+                        <span>{isPlaying ? (i18n.language === 'en' ? 'Playing' : 'চলছে') : (i18n.language === 'en' ? 'Play' : 'শুনুন')}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
+
                 <audio 
                   ref={audioRef} 
                   src={AUDIO_URL} 
-                  preload="metadata" 
+                  preload="auto" 
                   onError={() => {
-                    console.warn("Audio resource currently unavailable");
-                    setAudioError(true);
-                    setIsPlaying(false);
+                    console.warn("Audio resource error, falling back to encoded path");
+                    if (audioRef.current && audioRef.current.src.endsWith('/krishi_bondhu.mp3')) {
+                      audioRef.current.src = "/Krishi%20bondhu.mp3";
+                    } else {
+                      setAudioError(true);
+                      setIsPlaying(false);
+                    }
                   }}
                 />
               </div>
               {audioError && (
                 <p className="text-[10px] text-red-300 font-bold mt-2 uppercase tracking-widest text-center">
-                  {i18n.language === 'en' ? 'Audio currently unavailable' : 'অডিও বর্তমানে পাওয়া যাচ্ছে না'}
+                  {i18n.language === 'en' ? 'Audio file not found' : 'অডিও ফাইলটি পাওয়া যায়নি'}
                 </p>
               )}
             </motion.div>
@@ -164,7 +211,7 @@ export default function AboutUs() {
               transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
               className="relative w-48 h-48 sm:w-64 sm:h-64 shadow-2xl shadow-organic-green/30"
             >
-              <img src="/logo.png" className="w-full h-full object-contain" alt="Krishi Bondhu Logo" />
+              <img src="/krishi_logo.png" className="w-full h-full object-contain" alt="Krishi Bondhu Logo" />
             </motion.div>
             <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-32 h-6 bg-black/20 blur-xl rounded-[100%]" />
           </motion.div>

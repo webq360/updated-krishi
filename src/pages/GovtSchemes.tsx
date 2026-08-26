@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Landmark, BookOpen, Phone, ExternalLink, ChevronRight, Info, ShieldCheck, FileText, Users, MapPin, X, Navigation } from 'lucide-react';
 import { APIProvider, Map, AdvancedMarker, Pin, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
 
-const API_KEY = process.env.GOOGLE_MAPS_PLATFORM_KEY || '';
+const API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_PLATFORM_KEY as string) || (typeof process !== 'undefined' && (process.env as any)?.GOOGLE_MAPS_PLATFORM_KEY) || '';
 
 const DEFAULT_OFFICES = [
   {

@@ -1,6 +1,6 @@
 import React from 'react';
-import { db } from '../firebase';
-import { doc, deleteDoc } from 'firebase/firestore';
+import { useTranslation } from 'react-i18next';
+import { db, doc, deleteDoc } from '../lib/db';
 import { 
   Plus, 
   Edit2, 
@@ -43,6 +43,9 @@ import { BANGLADESH_DISTRICTS } from '../constants/districts';
 import { cn } from '../lib/utils';
 
 export function UserItem({ user, onUpdateRole, isAdmin }: any) {
+  const { i18n } = useTranslation();
+  const isBn = i18n.language !== 'en';
+
   return (
     <div className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div className="space-y-2">
@@ -69,11 +72,11 @@ export function UserItem({ user, onUpdateRole, isAdmin }: any) {
           )}
           <div className="flex items-center gap-2 sm:col-span-2">
             <MapPin size={14} className="text-[#8BA88B]" />
-            {user.address || 'No address provided'}
+            {user.address || (isBn ? 'ঠিকানা দেওয়া হয়নি' : 'No address provided')}
           </div>
           <div className="flex items-center gap-2 sm:col-span-2 text-[10px] text-[#8BA88B] mt-1">
             <Activity size={12} />
-            Registered: {user.createdAt?.toDate ? user.createdAt.toDate().toLocaleString() : (user.createdAt ? new Date(user.createdAt).toLocaleString() : 'N/A')}
+            {isBn ? 'নিবন্ধন তারিখ:' : 'Registered:'} {user.createdAt?.toDate ? user.createdAt.toDate().toLocaleString() : (user.createdAt ? new Date(user.createdAt).toLocaleString() : 'N/A')}
             {user.provider && (
               <span className="ml-2 px-1.5 py-0.5 bg-gray-100 rounded text-[9px] uppercase font-bold">{user.provider}</span>
             )}
@@ -94,15 +97,16 @@ export function UserItem({ user, onUpdateRole, isAdmin }: any) {
             className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E0E8E0] rounded-xl text-sm font-bold hover:bg-[#F0F5F0] transition-all"
           >
             <Shield size={16} />
-            {user.role === 'admin' ? 'Revoke Admin' : 'Make Admin'}
+            {user.role === 'admin' ? (isBn ? 'অ্যাডমিন বাতিল' : 'Revoke Admin') : (isBn ? 'অ্যাডমিন করুন' : 'Make Admin')}
           </button>
           <button 
             onClick={() => {
-              if (window.confirm("Delete this user?")) {
+              if (window.confirm(isBn ? "এই ইউজার ডিলিট করতে চান?" : "Delete this user?")) {
                 deleteDoc(doc(db, 'users', user.id));
               }
             }}
             className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+            title={isBn ? "মুছুন" : "Delete"}
           >
             <Trash2 size={18} />
           </button>
@@ -113,23 +117,56 @@ export function UserItem({ user, onUpdateRole, isAdmin }: any) {
 }
 
 export function ListItem({ item, onEdit, onDelete, isAdmin }: any) {
+  const title = item.name || item.title || item.seedName || item.machineName || item.ownerName || item.userName || (item.guide?.en ? 'Crop Guide' : 'Item');
+  const subtitle = item.category || item.speciesId || item.district || item.area || item.animalType || item.fishSpecies || item.season || item.stage;
+  
   return (
     <div className="flex items-center justify-between p-4 hover:bg-[#F9FBF9] transition-colors">
       <div className="flex items-center gap-4">
-        <div className="w-12 h-12 bg-[#F0F5F0] rounded-lg overflow-hidden">
-          <img src={item.imageUrl || `https://picsum.photos/seed/${item.name || item.title}/100/100`} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+        <div className="w-12 h-12 bg-[#F0F5F0] rounded-xl overflow-hidden shrink-0 border border-[#E0E8E0]">
+          <img 
+            src={item.imageUrl || item.thumbnail || `https://picsum.photos/seed/${encodeURIComponent(title)}/100/100`} 
+            alt="" 
+            className="w-full h-full object-cover" 
+            referrerPolicy="no-referrer" 
+          />
         </div>
-        <div>
-          <h4 className="font-bold">{item.name || item.title || item.seedName || item.machineName || item.ownerName || item.userName}</h4>
-          <p className="text-xs text-[#8BA88B] uppercase tracking-wider">{item.category || item.speciesId || item.district || item.area || item.animalType || item.fishSpecies}</p>
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="font-bold text-sm text-[#1B301B]">{title}</h4>
+            {item.price && (
+              <span className="text-xs font-black text-[#4CAF50] bg-green-50 px-2 py-0.5 rounded-md">
+                ৳{item.price} {item.unit ? `/${item.unit}` : ''}
+              </span>
+            )}
+            {item.isPaid && (
+              <span className="text-[9px] font-black uppercase tracking-wider bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded">
+                Featured
+              </span>
+            )}
+            {item.status && (
+              <span className={cn(
+                "text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded",
+                item.status === 'approved' || item.status === 'resolved' ? "bg-green-100 text-green-700" :
+                item.status === 'rejected' ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"
+              )}>
+                {item.status}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 text-xs text-[#8BA88B]">
+            {subtitle && <span className="uppercase tracking-wider font-semibold">{subtitle}</span>}
+            {item.contact && <span>📞 {item.contact}</span>}
+            {item.phone && <span>📞 {item.phone}</span>}
+          </div>
         </div>
       </div>
       {isAdmin && (
-        <div className="flex items-center gap-2">
-          <button onClick={() => onEdit(item)} className="p-2 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-colors">
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={() => onEdit(item)} className="p-2 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-colors" title="Edit">
             <Edit2 size={18} />
           </button>
-          <button onClick={() => onDelete(item.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+          <button onClick={() => onDelete(item.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
             <Trash2 size={18} />
           </button>
         </div>
@@ -139,6 +176,7 @@ export function ListItem({ item, onEdit, onDelete, isAdmin }: any) {
 }
 
 export function Form({ type, initialData, onSave, onCancel, speciesList }: any) {
+  const { i18n } = useTranslation();
   const [formData, setFormData] = React.useState(initialData || {});
 
   const SUB_CATEGORIES: Record<string, string[]> = {
@@ -193,8 +231,7 @@ export function Form({ type, initialData, onSave, onCancel, speciesList }: any) 
           <Textarea label="Description" value={formData.description} onChange={(v: string) => setFormData({...formData, description: v})} className="md:col-span-2" />
           <Textarea label="Farming Method" value={formData.farmingMethod} onChange={v => setFormData({...formData, farmingMethod: v})} />
           <Input label="Stocking Density" value={formData.stockingDensity} onChange={v => setFormData({...formData, stockingDensity: v})} />
-          <Textarea label="Biosecurity" value={formData.biosecurity} onChange={v => setFormData({...formData, biosecurity: v})} />
-          <Input label="Image URL" value={formData.imageUrl} onChange={v => setFormData({...formData, imageUrl: v})} />
+          <ImageUploadInput label="Species Photo" value={formData.imageUrl} onChange={(v: string) => setFormData({...formData, imageUrl: v})} folder="krishi-species" />
         </>
       )}
 
@@ -299,7 +336,7 @@ export function Form({ type, initialData, onSave, onCancel, speciesList }: any) 
             />
           )}
           <Input label="Order Link" value={formData.orderLink} onChange={(v: string) => setFormData({...formData, orderLink: v})} />
-          <Input label="Image URL" value={formData.imageUrl} onChange={(v: string) => setFormData({...formData, imageUrl: v})} />
+          <ImageUploadInput label="Product Photo" value={formData.imageUrl} onChange={(v: string) => setFormData({...formData, imageUrl: v})} folder="krishi-products" />
           <Textarea label="Description" value={formData.description} onChange={(v: string) => setFormData({...formData, description: v})} className="md:col-span-2" required />
           <Textarea label="Benefits (One per line)" value={formData.benefits} onChange={(v: string) => setFormData({...formData, benefits: v})} className="md:col-span-2" required />
         </>
@@ -311,7 +348,7 @@ export function Form({ type, initialData, onSave, onCancel, speciesList }: any) 
           <Input label="Price Range (e.g. 60-70)" value={formData.price} onChange={(v: string) => setFormData({...formData, price: v})} required />
           <Input label="Current Market Price" value={formData.marketPrice} onChange={(v: string) => setFormData({...formData, marketPrice: v})} />
           <Input label="Unit (e.g. kg, maund)" value={formData.unit} onChange={(v: string) => setFormData({...formData, unit: v})} required />
-          <Input label="Image URL" value={formData.imageUrl} onChange={(v: string) => setFormData({...formData, imageUrl: v})} />
+          <ImageUploadInput label="Market Product Photo" value={formData.imageUrl} onChange={(v: string) => setFormData({...formData, imageUrl: v})} folder="krishi-market" />
           <Select 
             label="District" 
             value={formData.district} 
@@ -636,7 +673,7 @@ export function Form({ type, initialData, onSave, onCancel, speciesList }: any) 
           />
           <Textarea label="Content (English)" value={formData.content_en} onChange={(v: string) => setFormData({...formData, content_en: v})} className="md:col-span-2" required />
           <Textarea label="Content (Bengali)" value={formData.content_bn} onChange={(v: string) => setFormData({...formData, content_bn: v})} className="md:col-span-2" required />
-          <Input label="Image URL" value={formData.imageUrl} onChange={(v: string) => setFormData({...formData, imageUrl: v})} />
+          <ImageUploadInput label="Article Photo" value={formData.imageUrl} onChange={(v: string) => setFormData({...formData, imageUrl: v})} folder="krishi-knowledge" />
         </>
       )}
 
@@ -645,7 +682,7 @@ export function Form({ type, initialData, onSave, onCancel, speciesList }: any) 
           <Input label="Title (English)" value={formData.title} onChange={(v: string) => setFormData({...formData, title: v})} required />
           <Input label="Title (Bengali)" value={formData.titleBn} onChange={(v: string) => setFormData({...formData, titleBn: v})} required />
           <Input label="YouTube Embed URL (e.g. https://www.youtube.com/embed/XXXX)" value={formData.url} onChange={(v: string) => setFormData({...formData, url: v})} required />
-          <Input label="Thumbnail URL" value={formData.thumbnail} onChange={(v: string) => setFormData({...formData, thumbnail: v})} />
+          <ImageUploadInput label="Video Thumbnail" value={formData.thumbnail} onChange={(v: string) => setFormData({...formData, thumbnail: v})} folder="krishi-videos" />
           <Input label="Duration (e.g. 12:45)" value={formData.duration} onChange={(v: string) => setFormData({...formData, duration: v})} />
           <Input label="Category (English)" value={formData.category} onChange={(v: string) => setFormData({...formData, category: v})} required />
           <Input label="Category (Bengali)" value={formData.categoryBn} onChange={(v: string) => setFormData({...formData, categoryBn: v})} required />
@@ -666,7 +703,7 @@ export function Form({ type, initialData, onSave, onCancel, speciesList }: any) 
           <Input label="District (Bengali)" value={formData.district_bn} onChange={(v: string) => setFormData({...formData, district_bn: v})} required />
           <Input label="Contact" value={formData.contact} onChange={(v: string) => setFormData({...formData, contact: v})} required />
           <Input label="Quantity" value={formData.quantity} onChange={(v: string) => setFormData({...formData, quantity: v})} />
-          <Input label="Image URL" value={formData.imageUrl} onChange={(v: string) => setFormData({...formData, imageUrl: v})} />
+          <ImageUploadInput label="Seed Photo" value={formData.imageUrl} onChange={(v: string) => setFormData({...formData, imageUrl: v})} folder="krishi-seeds" />
           <Select 
             label="Type" 
             value={formData.type} 
@@ -759,10 +796,12 @@ export function Form({ type, initialData, onSave, onCancel, speciesList }: any) 
       )}
 
       <div className="md:col-span-2 flex justify-end gap-3 pt-4 border-t border-[#E0E8E0]">
-        <button type="button" onClick={onCancel} className="px-6 py-2 text-[#556B55] font-bold hover:bg-[#E0E8E0] rounded-xl transition-all">Cancel</button>
+        <button type="button" onClick={onCancel} className="px-6 py-2 text-[#556B55] font-bold hover:bg-[#E0E8E0] rounded-xl transition-all">
+          {i18n.language === 'en' ? 'Cancel' : 'বাতিল'}
+        </button>
         <button type="submit" className="px-6 py-2 bg-[#4CAF50] text-white font-bold rounded-xl hover:bg-[#43A047] transition-all shadow-lg shadow-[#4CAF50]/20 flex items-center gap-2">
           <Save size={20} />
-          Save
+          {i18n.language === 'en' ? 'Save' : 'সংরক্ষণ করুন'}
         </button>
       </div>
     </form>
@@ -799,6 +838,7 @@ export function Textarea({ label, value, onChange, className, ...props }: any) {
 }
 
 export function Select({ label, value, onChange, options, ...props }: any) {
+  const { i18n } = useTranslation();
   return (
     <div className="space-y-1">
       <label className="text-xs font-bold text-[#556B55] uppercase tracking-wider">{label}</label>
@@ -808,11 +848,62 @@ export function Select({ label, value, onChange, options, ...props }: any) {
         className="w-full px-4 py-2 bg-white border border-[#E0E8E0] rounded-xl focus:ring-2 focus:ring-[#4CAF50] outline-none transition-all"
         {...props}
       >
-        <option value="">Select...</option>
+        <option value="">{i18n.language === 'en' ? 'Select...' : 'বাছাই করুন...'}</option>
         {options.map((opt: any) => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
+    </div>
+  );
+}
+
+export function ImageUploadInput({ label, value, onChange, folder = 'krishi-admin' }: any) {
+  const { i18n } = useTranslation();
+  const [uploading, setUploading] = React.useState(false);
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploading(true);
+      try {
+        const { uploadToCloudinary } = await import('../lib/imageUtils');
+        const url = await uploadToCloudinary(file, folder);
+        onChange(url);
+      } catch (err) {
+        console.error("Upload error:", err);
+      } finally {
+        setUploading(false);
+      }
+    }
+  };
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-bold text-[#556B55] uppercase tracking-wider">{label}</label>
+        {uploading && (
+          <span className="text-[10px] text-[#4CAF50] font-bold animate-pulse">
+            {i18n.language === 'en' ? 'Uploading to Cloudinary...' : 'ক্লাউডিনারিতে আপলোড হচ্ছে...'}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <input 
+          type="text" 
+          value={value || ''} 
+          onChange={e => onChange(e.target.value)} 
+          placeholder={i18n.language === 'en' ? "https://... or upload photo" : "https://... অথবা ছবি আপলোড করুন"}
+          className="flex-1 px-4 py-2 bg-white border border-[#E0E8E0] rounded-xl focus:ring-2 focus:ring-[#4CAF50] outline-none transition-all text-sm"
+        />
+        <label className="px-3 py-2 bg-[#F0F5F0] hover:bg-[#E8F5E9] text-[#1B301B] rounded-xl text-xs font-bold cursor-pointer transition-all shrink-0">
+          {i18n.language === 'en' ? 'Upload' : 'ছবি আপলোড'}
+          <input type="file" accept="image/*" onChange={handleFile} className="hidden" />
+        </label>
+      </div>
+      {value && (
+        <div className="w-12 h-12 rounded-lg overflow-hidden border border-[#E0E8E0] mt-1">
+          <img src={value} alt="" className="w-full h-full object-cover" />
+        </div>
+      )}
     </div>
   );
 }

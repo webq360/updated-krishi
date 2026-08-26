@@ -3,9 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 import { Droplets, Camera, Send, RefreshCw, CheckCircle2, ChevronLeft, Info, Thermometer, FlaskConical } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { db, auth } from '../firebase';
-import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
-import { compressBase64 } from '../lib/imageUtils';
+import { db, auth, collection, addDoc, serverTimestamp, query, where, getDocs } from '../lib/db';
+import { compressBase64, uploadToCloudinary } from '../lib/imageUtils';
 
 export default function FishWaterTest() {
   const { i18n } = useTranslation();
@@ -51,19 +50,19 @@ export default function FishWaterTest() {
     }
   };
 
-  const handleNidUpload = (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
+  const handleNidUpload = async (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
     const file = e.target.files?.[0];
     if (!file) return;
     setIsCompressing(prev => ({ ...prev, [side]: true }));
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      const compressed = await compressBase64(base64, 400, 400, 0.3);
-      if (side === 'front') setNidFront(compressed);
-      else setNidBack(compressed);
+    try {
+      const url = await uploadToCloudinary(file, 'krishi-fish');
+      if (side === 'front') setNidFront(url);
+      else setNidBack(url);
+    } catch (err) {
+      console.error("Fish test NID upload error:", err);
+    } finally {
       setIsCompressing(prev => ({ ...prev, [side]: false }));
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
