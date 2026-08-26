@@ -5,6 +5,11 @@ import dotenv from "dotenv";
 import mongoose, { Schema, Document, Model } from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import dns from "dns";
+
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch {}
 
 dotenv.config();
 
