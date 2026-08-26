@@ -98,6 +98,8 @@ export default function AdminPanel() {
   const [selectedPaymentReceipt, setSelectedPaymentReceipt] = useState<any>(null);
   const [protectionStatusFilter, setProtectionStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'claimed'>('all');
   const [selectedProtectionDetails, setSelectedProtectionDetails] = useState<any>(null);
+  const [protectionUpdateCropFilter, setProtectionUpdateCropFilter] = useState<string>('all');
+  const [selectedProtectionUpdate, setSelectedProtectionUpdate] = useState<any>(null);
   
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -2503,28 +2505,234 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {activeTab === 'protection-updates' && filterData(protectionUpdates).map(upd => (
-              <div key={upd.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center gap-6">
-                <div className="w-24 h-24 bg-gray-100 rounded-2xl overflow-hidden shadow-sm shrink-0 border border-white">
-                  <img src={upd.updatePic} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                </div>
-                <div className="space-y-2 flex-1">
-                  <div className="flex items-center gap-2">
-                    <RefreshCw size={18} className="text-[#4CAF50]" />
-                    <h4 className="font-bold text-lg">{upd.userName}</h4>
-                    <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold uppercase">{upd.cropType}</span>
+            {activeTab === 'protection-updates' && (
+              <div className="p-6 space-y-6">
+                {/* KPI Overview Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-5 rounded-2xl border border-emerald-200">
+                    <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider">{isBn ? 'মোট মাঠ পরিদর্শন রিপোর্ট' : 'Total Field Logs'}</p>
+                    <h3 className="text-2xl font-black text-emerald-900 mt-1">{protectionUpdates.length}</h3>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 text-xs text-[#556B55]">
-                    <p><strong>ID:</strong> {upd.protectionId}</p>
-                    <p><strong>Date:</strong> {upd.date}</p>
-                    <p className="col-span-2"><strong>Details:</strong> {upd.details}</p>
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 rounded-2xl border border-blue-200">
+                    <p className="text-xs font-bold text-blue-700 uppercase tracking-wider">{isBn ? 'এজেন্ট পরিদর্শন রিপোর্ট' : 'Agent Inspected'}</p>
+                    <h3 className="text-2xl font-black text-blue-900 mt-1">{protectionUpdates.filter(u => !!u.agentId).length}</h3>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-5 rounded-2xl border border-purple-200">
+                    <p className="text-xs font-bold text-purple-700 uppercase tracking-wider">{isBn ? 'সরাসরি কৃষক আপডেট' : 'Farmer Direct'}</p>
+                    <h3 className="text-2xl font-black text-purple-900 mt-1">{protectionUpdates.filter(u => !u.agentId).length}</h3>
+                  </div>
+                  <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-5 rounded-2xl border border-amber-200">
+                    <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">{isBn ? 'সর্বশেষ পরিদর্শন' : 'Latest Update'}</p>
+                    <h3 className="text-sm font-black text-amber-900 mt-2">
+                      {protectionUpdates.length > 0 ? (protectionUpdates[0]?.date || 'Recently') : 'N/A'}
+                    </h3>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                   {isAdmin && <button onClick={() => handleDelete(upd.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>}
+
+                {/* Filter Pills & Add Button */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                      { key: 'all', label: isBn ? 'সকল আপডেট' : 'All Updates', count: protectionUpdates.length },
+                      { key: 'Rice', label: isBn ? 'ধান ফসল' : 'Rice', count: protectionUpdates.filter(u => (u.cropType || '').toLowerCase().includes('rice') || (u.cropType || '').includes('ধান')).length },
+                      { key: 'Fish', label: isBn ? 'মাছ চাষ' : 'Fish', count: protectionUpdates.filter(u => (u.cropType || '').toLowerCase().includes('fish') || (u.cropType || '').includes('মাছ')).length },
+                      { key: 'Poultry', label: isBn ? 'পোল্ট্রি খামার' : 'Poultry', count: protectionUpdates.filter(u => (u.cropType || '').toLowerCase().includes('poultry') || (u.cropType || '').includes('মুরগি')).length },
+                      { key: 'Livestock', label: isBn ? 'গবাদিপশু' : 'Livestock', count: protectionUpdates.filter(u => (u.cropType || '').toLowerCase().includes('livestock') || (u.cropType || '').includes('পশু')).length },
+                    ].map(f => (
+                      <button
+                        key={f.key}
+                        onClick={() => setProtectionUpdateCropFilter(f.key)}
+                        className={cn(
+                          "px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border",
+                          protectionUpdateCropFilter === f.key 
+                            ? "bg-[#4CAF50] text-white border-[#4CAF50] shadow-md shadow-green-900/20"
+                            : "bg-white text-[#556B55] border-[#E0E8E0] hover:bg-[#F0F5F0]"
+                        )}
+                      >
+                        <span>{f.label}</span>
+                        <span className={cn(
+                          "px-1.5 py-0.2 rounded-full text-[10px] font-black",
+                          protectionUpdateCropFilter === f.key ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
+                        )}>{f.count}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setEditingItem({
+                          date: new Date().toISOString().split('T')[0],
+                          cropType: 'Rice',
+                          details: '',
+                          protectionId: '',
+                          userName: '',
+                          updatePic: ''
+                        });
+                        setIsAdding(true);
+                      }}
+                      className="px-4 py-2 bg-[#4CAF50] text-white rounded-xl text-xs font-bold hover:bg-[#43A047] transition-all flex items-center gap-1.5 shadow-md shadow-green-900/20"
+                    >
+                      <Plus size={16} />
+                      {isBn ? 'নতুন মাঠ পরিদর্শন আপডেট' : 'Add Inspection Update'}
+                    </button>
+                  )}
                 </div>
+
+                {/* Updates List */}
+                <div className="space-y-4">
+                  {filterData(protectionUpdates)
+                    .filter(upd => {
+                      if (protectionUpdateCropFilter === 'all') return true;
+                      return (upd.cropType || '').toLowerCase().includes(protectionUpdateCropFilter.toLowerCase());
+                    })
+                    .map(upd => (
+                      <div key={upd.id} className="p-6 bg-white rounded-2xl border border-[#E0E8E0] hover:border-[#4CAF50] transition-all shadow-sm flex flex-col md:flex-row items-start md:items-center gap-6">
+                        <div 
+                          onClick={() => setSelectedProtectionUpdate(upd)}
+                          className="w-28 h-28 bg-gray-100 rounded-2xl overflow-hidden shadow-sm shrink-0 border border-[#E0E8E0] cursor-pointer group relative"
+                        >
+                          <img src={upd.updatePic} alt="Crop Update" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" referrerPolicy="no-referrer" />
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                            <Info size={20} />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 flex-1">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <RefreshCw size={18} className="text-[#4CAF50]" />
+                            <h4 className="font-bold text-lg text-[#1B301B]">{upd.userName || 'Farmer'}</h4>
+                            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider border border-emerald-200">
+                              {upd.cropType || 'Crop'}
+                            </span>
+                            {upd.agentId && (
+                              <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold">
+                                Agent: {upd.agentId}
+                              </span>
+                            )}
+                            {upd.status && (
+                              <span className={cn(
+                                "text-[10px] px-2 py-0.5 rounded-full font-bold uppercase",
+                                upd.status === 'verified' ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                              )}>
+                                {upd.status}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-[#556B55] bg-[#F9FBF9] p-3 rounded-xl border border-[#E0E8E0]">
+                            <p><strong>Protection ID:</strong> <span className="font-mono font-bold text-[#1B301B]">{upd.protectionId || 'N/A'}</span></p>
+                            <p><strong>{isBn ? 'তারিখ:' : 'Date:'}</strong> <span className="font-semibold text-[#1B301B]">{upd.date || 'N/A'}</span></p>
+                            <p className="sm:col-span-2 text-sm text-[#1B301B] mt-1 pt-1 border-t border-gray-200">
+                              <strong>{isBn ? 'মাঠের অবস্থা / রিপোর্ট:' : 'Condition Report:'}</strong> {upd.details}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex md:flex-col items-end gap-2 shrink-0 justify-end">
+                          <button
+                            onClick={() => setSelectedProtectionUpdate(upd)}
+                            className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all flex items-center gap-1"
+                          >
+                            <Info size={14} />
+                            {isBn ? 'ছবি ও বিবরণ' : 'View'}
+                          </button>
+
+                          {isAdmin && (
+                            <div className="flex items-center gap-2">
+                              {upd.status !== 'verified' && (
+                                <button
+                                  onClick={() => updateDoc(doc(db, 'protectionUpdates', upd.id), { status: 'verified' })}
+                                  className="px-3 py-1 bg-green-50 text-green-700 rounded-lg text-xs font-bold hover:bg-green-100 transition-all"
+                                >
+                                  {isBn ? 'ভেরিফাই' : 'Verify'}
+                                </button>
+                              )}
+                              <button onClick={() => setEditingItem(upd)} className="p-1.5 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-colors">
+                                <Edit2 size={16} />
+                              </button>
+                              <button onClick={() => handleDelete(upd.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                  {filterData(protectionUpdates).filter(u => protectionUpdateCropFilter === 'all' || (u.cropType || '').toLowerCase().includes(protectionUpdateCropFilter.toLowerCase())).length === 0 && (
+                    <div className="p-12 text-center text-[#556B55] bg-white rounded-2xl border border-dashed border-[#E0E8E0]">
+                      <RefreshCw size={36} className="mx-auto text-[#8BA88B] mb-2 opacity-50" />
+                      <p className="font-bold">{isBn ? 'এই ফিল্টারে কোনো মাঠ পরিদর্শন রিপোর্ট নেই' : 'No protection update logs found'}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected Protection Update Zoom Modal */}
+                {selectedProtectionUpdate && (
+                  <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-2xl border border-[#E0E8E0]"
+                    >
+                      <div className="flex items-center justify-between pb-3 border-b border-[#E0E8E0]">
+                        <div>
+                          <h3 className="text-lg font-black text-[#1B301B]">
+                            {isBn ? 'মাঠ পরিদর্শন ও ফসল রিপোর্ট' : 'Field Inspection & Photo Log'}
+                          </h3>
+                          <p className="text-xs text-[#8BA88B]">ID: <span className="font-mono font-bold text-[#1B301B]">{selectedProtectionUpdate.protectionId}</span></p>
+                        </div>
+                        <button onClick={() => setSelectedProtectionUpdate(null)} className="p-1.5 hover:bg-[#F0F5F0] rounded-full transition-colors">
+                          <X size={18} />
+                        </button>
+                      </div>
+
+                      <div className="rounded-2xl overflow-hidden border border-[#E0E8E0] max-h-72 bg-black">
+                        <img src={selectedProtectionUpdate.updatePic} alt="Field Zoom" className="w-full h-full object-contain" />
+                      </div>
+
+                      <div className="bg-[#F9FBF9] p-4 rounded-2xl border border-[#E0E8E0] space-y-2 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-[#8BA88B]">{isBn ? 'কৃষক:' : 'Farmer:'}</span>
+                          <span className="font-bold text-[#1B301B]">{selectedProtectionUpdate.userName}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-[#8BA88B]">{isBn ? 'ফসল / খাত:' : 'Crop:'}</span>
+                          <span className="font-bold text-[#1B301B]">{selectedProtectionUpdate.cropType}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-[#8BA88B]">{isBn ? 'তারিখ:' : 'Inspection Date:'}</span>
+                          <span className="font-bold text-[#1B301B]">{selectedProtectionUpdate.date}</span>
+                        </div>
+                        {selectedProtectionUpdate.agentId && (
+                          <div className="flex justify-between">
+                            <span className="text-[#8BA88B]">{isBn ? 'পরিদর্শনকারী এজেন্ট:' : 'Field Agent:'}</span>
+                            <span className="font-bold text-blue-700">{selectedProtectionUpdate.agentId}</span>
+                          </div>
+                        )}
+                        <div className="pt-2 border-t border-gray-200">
+                          <span className="text-[#8BA88B] block mb-1">{isBn ? 'বিস্তারিত রিপোর্ট:' : 'Detailed Report:'}</span>
+                          <p className="text-sm text-[#1B301B] bg-white p-3 rounded-xl border border-gray-200 leading-relaxed">
+                            {selectedProtectionUpdate.details}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-3 pt-2">
+                        <button
+                          onClick={() => setSelectedProtectionUpdate(null)}
+                          className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-bold text-xs transition-all"
+                        >
+                          {isBn ? 'বন্ধ করুন' : 'Close'}
+                        </button>
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
               </div>
-            ))}
+            )}
 
             {activeTab === 'pona' && filterData(ponaOrders).map(o => (
               <div key={o.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">

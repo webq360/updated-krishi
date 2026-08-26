@@ -594,6 +594,43 @@ export function Form({ type, initialData, onSave, onCancel, speciesList }: any) 
         </>
       )}
 
+      {type === 'protection-updates' && (
+        <>
+          <Input label="Protection ID (e.g. SR-XXXXXXXX)" value={formData.protectionId} onChange={(v: string) => setFormData({...formData, protectionId: v})} required />
+          <Input label="Farmer / Applicant Name" value={formData.userName || formData.name} onChange={(v: string) => setFormData({...formData, userName: v, name: v})} required />
+          <Select 
+            label="Insured Crop / Sector" 
+            value={formData.cropType} 
+            onChange={(v: string) => setFormData({...formData, cropType: v})} 
+            options={[
+              { label: 'Rice (ধান)', value: 'Rice' },
+              { label: 'Fish (মাছ)', value: 'Fish' },
+              { label: 'Poultry (পোল্ট্রি)', value: 'Poultry' },
+              { label: 'Livestock (গবাদিপশু)', value: 'Livestock' },
+              { label: 'Wheat (গম)', value: 'Wheat' },
+              { label: 'Potato (আলু)', value: 'Potato' },
+              { label: 'Jute (পাট)', value: 'Jute' },
+              { label: 'Maize (ভুট্টা)', value: 'Maize' }
+            ]} 
+            required
+          />
+          <Input label="Update / Inspection Date" value={formData.date || new Date().toISOString().split('T')[0]} onChange={(v: string) => setFormData({...formData, date: v})} required />
+          <Input label="Reporting Agent ID (Optional)" value={formData.agentId} onChange={(v: string) => setFormData({...formData, agentId: v})} />
+          <Select 
+            label="Verification / Review Status" 
+            value={formData.status || 'verified'} 
+            onChange={(v: string) => setFormData({...formData, status: v})} 
+            options={[
+              { label: 'Verified (যাচাইকৃত)', value: 'verified' },
+              { label: 'Pending Review (পর্যালোচনাধীন)', value: 'pending' },
+              { label: 'Claim Requested (ক্লেইম আবেদন)', value: 'claim_requested' }
+            ]} 
+          />
+          <ImageUploadInput label="Field / Damage Inspection Photo" value={formData.updatePic} onChange={(v: string) => setFormData({...formData, updatePic: v})} folder="krishi-suraksha" required />
+          <Textarea label="Field Condition & Progress Notes" value={formData.details} onChange={(v: string) => setFormData({...formData, details: v})} className="md:col-span-2" required />
+        </>
+      )}
+
       {(type === 'pona' || type === 'training' || type === 'exports') && (
         <>
           <Input label="User Name" value={formData.userName || formData.name} onChange={(v: string) => setFormData({...formData, userName: v, name: v})} required />
