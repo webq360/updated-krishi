@@ -92,6 +92,8 @@ export default function AdminPanel() {
   const [videos, setVideos] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loanStatusFilter, setLoanStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'disbursed'>('all');
+  const [selectedLoanDetails, setSelectedLoanDetails] = useState<any>(null);
   
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -1658,50 +1660,318 @@ export default function AdminPanel() {
               </div>
             ))}
 
-            {activeTab === 'loans' && filterData(loans).map(loan => (
-              <div key={loan.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Landmark size={18} className="text-[#4CAF50]" />
-                    <h4 className="font-bold text-lg">{loan.name || loan.userName}</h4>
-                    <span className={cn(
-                      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
-                      loan.status === 'approved' ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
-                    )}>{loan.status}</span>
+            {activeTab === 'loans' && (
+              <div className="p-6 space-y-6">
+                {/* Loan KPI Overview Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-5 rounded-2xl border border-green-200">
+                    <p className="text-xs font-bold text-green-700 uppercase tracking-wider">{isBn ? 'মোট আবেদন' : 'Total Applications'}</p>
+                    <h3 className="text-2xl font-black text-green-900 mt-1">{loans.length}</h3>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm text-[#556B55]">
-                    <p><strong>Loan ID:</strong> <span className="font-black">{loan.loanId || 'N/A'}</span></p>
-                    <p><strong>Amount:</strong> {loan.amount} TK</p>
-                    <p><strong>Phone:</strong> {loan.phone}</p>
-                    <p><strong>Location:</strong> {loan.upazila}, {loan.district}</p>
-                    <p className="col-span-2 text-xs bg-emerald-50 p-1 rounded"><strong>Referred By:</strong> {loan.referredByAgentName ? `${loan.referredByAgentName} [${loan.referredByAgentId}]` : 'None'}</p>
+                  <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-5 rounded-2xl border border-amber-200">
+                    <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">{isBn ? 'অপেক্ষমাণ অনুমোদন' : 'Pending Approvals'}</p>
+                    <h3 className="text-2xl font-black text-amber-900 mt-1">{loans.filter(l => !l.status || l.status === 'pending').length}</h3>
+                  </div>
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 rounded-2xl border border-blue-200">
+                    <p className="text-xs font-bold text-blue-700 uppercase tracking-wider">{isBn ? 'মোট আবেদনকৃত অর্থ' : 'Requested Total'}</p>
+                    <h3 className="text-xl font-black text-blue-900 mt-1">৳{loans.reduce((acc, l) => acc + (parseFloat(l.amount) || 0), 0).toLocaleString()}</h3>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-5 rounded-2xl border border-purple-200">
+                    <p className="text-xs font-bold text-purple-700 uppercase tracking-wider">{isBn ? 'মোট অনুমোদিত অর্থ' : 'Approved Total'}</p>
+                    <h3 className="text-xl font-black text-purple-900 mt-1">৳{loans.filter(l => l.status === 'approved' || l.status === 'disbursed').reduce((acc, l) => acc + (parseFloat(l.approvedAmount || l.amount) || 0), 0).toLocaleString()}</h3>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  {isAdmin && (
-                    <button 
-                      onClick={() => {
-                        setEditingItem({ 
-                          loanId: loan.loanId, 
-                          agentId: loan.referredByAgentId || null,
-                          userName: loan.name || loan.userName,
-                          date: new Date().toISOString().split('T')[0], 
-                          amount: '' 
-                        });
-                        setActiveTab('loan-payments');
-                        setIsAdding(true);
-                      }} 
-                      className="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold hover:bg-purple-100 transition-all"
-                    >
-                      + Entry
-                    </button>
+
+                {/* Filter Pills */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                      { key: 'all', label: isBn ? 'সকল আবেদন' : 'All Loans', count: loans.length },
+                      { key: 'pending', label: isBn ? 'অপেক্ষমাণ' : 'Pending', count: loans.filter(l => !l.status || l.status === 'pending').length },
+                      { key: 'approved', label: isBn ? 'অনুমোদিত' : 'Approved', count: loans.filter(l => l.status === 'approved').length },
+                      { key: 'disbursed', label: isBn ? 'বিতরণকৃত' : 'Disbursed', count: loans.filter(l => l.status === 'disbursed').length },
+                      { key: 'rejected', label: isBn ? 'বাতিল' : 'Rejected', count: loans.filter(l => l.status === 'rejected').length },
+                    ].map(f => (
+                      <button
+                        key={f.key}
+                        onClick={() => setLoanStatusFilter(f.key as any)}
+                        className={cn(
+                          "px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border",
+                          loanStatusFilter === f.key 
+                            ? "bg-[#4CAF50] text-white border-[#4CAF50] shadow-md shadow-green-900/20"
+                            : "bg-white text-[#556B55] border-[#E0E8E0] hover:bg-[#F0F5F0]"
+                        )}
+                      >
+                        <span>{f.label}</span>
+                        <span className={cn(
+                          "px-1.5 py-0.2 rounded-full text-[10px] font-black",
+                          loanStatusFilter === f.key ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
+                        )}>{f.count}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Loans List */}
+                <div className="space-y-4">
+                  {filterData(loans)
+                    .filter(loan => {
+                      if (loanStatusFilter === 'all') return true;
+                      return (loan.status || 'pending').toLowerCase() === loanStatusFilter;
+                    })
+                    .map(loan => (
+                      <div key={loan.id} className="p-6 bg-white rounded-2xl border border-[#E0E8E0] hover:border-[#4CAF50] transition-all shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                        <div className="space-y-3 flex-1">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black">
+                              <Landmark size={20} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-lg text-[#1B301B]">{loan.name || loan.userName}</h4>
+                                <span className={cn(
+                                  "px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider",
+                                  loan.status === 'approved' ? "bg-green-100 text-green-700 border border-green-200" :
+                                  loan.status === 'disbursed' ? "bg-purple-100 text-purple-700 border border-purple-200" :
+                                  loan.status === 'rejected' ? "bg-red-100 text-red-700 border border-red-200" :
+                                  "bg-amber-100 text-amber-800 border border-amber-200"
+                                )}>
+                                  {loan.status || 'pending'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-[#8BA88B] font-mono mt-0.5">
+                                ID: <span className="font-bold text-[#1B301B]">{loan.loanId || loan.id}</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 text-xs text-[#556B55] bg-[#F9FBF9] p-3 rounded-xl border border-[#E0E8E0]">
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'আবেদনকৃত ঋণ:' : 'Requested:'}</span>
+                              <strong className="text-sm text-[#1B301B]">৳{(parseFloat(loan.amount) || 0).toLocaleString()}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'অনুমোদিত পরিমাণ:' : 'Approved:'}</span>
+                              <strong className="text-sm text-green-700">৳{(parseFloat(loan.approvedAmount || loan.amount) || 0).toLocaleString()}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'ফোন নম্বর:' : 'Phone:'}</span>
+                              <span className="font-bold text-[#1B301B]">{loan.phone}</span>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'খামার খাত:' : 'Farming Sector:'}</span>
+                              <span className="font-bold text-[#1B301B]">{loan.farmingType || loan.cropType || 'Agriculture'}</span>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'এলাকা:' : 'Location:'}</span>
+                              <span>{loan.upazila ? `${loan.upazila}, ` : ''}{loan.district || 'Bangladesh'}</span>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'মেয়াদ:' : 'Duration:'}</span>
+                              <span>{loan.duration || '12'} Months</span>
+                            </div>
+                            <div className="sm:col-span-2">
+                              <span className="text-[#8BA88B] block">{isBn ? 'রেফারেল এজেন্ট:' : 'Referred By:'}</span>
+                              <span className="font-semibold text-emerald-800">{loan.referredByAgentName ? `${loan.referredByAgentName} (${loan.referredByAgentId})` : 'Direct Application'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-wrap lg:flex-col items-end gap-2 shrink-0 border-t lg:border-t-0 pt-3 lg:pt-0">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setSelectedLoanDetails(loan)}
+                              className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all flex items-center gap-1"
+                            >
+                              <Info size={14} />
+                              {isBn ? 'বিস্তারিত' : 'Details'}
+                            </button>
+
+                            {isAdmin && (
+                              <button 
+                                onClick={() => {
+                                  setEditingItem({ 
+                                    loanId: loan.loanId || loan.id, 
+                                    agentId: loan.referredByAgentId || null,
+                                    userName: loan.name || loan.userName,
+                                    date: new Date().toISOString().split('T')[0], 
+                                    amount: '' 
+                                  });
+                                  setActiveTab('loan-payments');
+                                  setIsAdding(true);
+                                }} 
+                                className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-xl text-xs font-bold hover:bg-purple-100 transition-all flex items-center gap-1"
+                                title={isBn ? "কিস্তি জমা এন্ট্রি" : "Add Installment Entry"}
+                              >
+                                <Plus size={14} />
+                                {isBn ? 'কিস্তি' : 'Entry'}
+                              </button>
+                            )}
+                          </div>
+
+                          {isAdmin && (
+                            <div className="flex items-center gap-2">
+                              {loan.status !== 'approved' && loan.status !== 'disbursed' && (
+                                <button 
+                                  onClick={async () => {
+                                    const approvedAmt = prompt(isBn ? 'অনুমোদিত ঋণের পরিমাণ লিখুন (টাকা):' : 'Enter Approved Loan Amount (TK):', loan.amount);
+                                    if (approvedAmt) {
+                                      await updateDoc(doc(db, 'loanApplications', loan.id), { 
+                                        status: 'approved', 
+                                        approvedAmount: approvedAmt,
+                                        approvalDate: serverTimestamp() 
+                                      });
+                                      await addDoc(collection(db, 'notifications'), {
+                                        userId: loan.userId || '',
+                                        title: 'বন্ধু কৃষি ঋণ অনুমোদিত হয়েছে',
+                                        message: `আপনার ৳${approvedAmt} টাকার ঋণ আবেদন (${loan.loanId || loan.id}) সফলভাবে অনুমোদিত হয়েছে।`,
+                                        type: 'loan',
+                                        createdAt: serverTimestamp()
+                                      });
+                                    }
+                                  }} 
+                                  className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-sm"
+                                >
+                                  <CheckCircle2 size={14} />
+                                  {isBn ? 'অনুমোদন' : 'Approve'}
+                                </button>
+                              )}
+
+                              {loan.status === 'approved' && (
+                                <button 
+                                  onClick={() => updateDoc(doc(db, 'loanApplications', loan.id), { status: 'disbursed', disbursedDate: serverTimestamp() })}
+                                  className="px-3 py-1.5 bg-purple-600 text-white rounded-xl text-xs font-bold hover:bg-purple-700 transition-all"
+                                >
+                                  {isBn ? 'বিতরণ সম্পন্ন' : 'Mark Disbursed'}
+                                </button>
+                              )}
+
+                              {loan.status !== 'rejected' && (
+                                <button 
+                                  onClick={async () => {
+                                    if (confirm(isBn ? 'আপনি কি এই আবেদনটি বাতিল করতে চান?' : 'Are you sure you want to reject this loan?')) {
+                                      await updateDoc(doc(db, 'loanApplications', loan.id), { status: 'rejected' });
+                                    }
+                                  }} 
+                                  className="px-2.5 py-1.5 bg-red-50 text-red-600 rounded-xl text-xs font-bold hover:bg-red-100 transition-all"
+                                >
+                                  {isBn ? 'বাতিল' : 'Reject'}
+                                </button>
+                              )}
+
+                              <button onClick={() => setEditingItem(loan)} className="p-1.5 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-colors">
+                                <Edit2 size={16} />
+                              </button>
+                              <button onClick={() => handleDelete(loan.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                  {filterData(loans).filter(l => loanStatusFilter === 'all' || (l.status || 'pending').toLowerCase() === loanStatusFilter).length === 0 && (
+                    <div className="p-12 text-center text-[#556B55] bg-white rounded-2xl border border-dashed border-[#E0E8E0]">
+                      <Landmark size={36} className="mx-auto text-[#8BA88B] mb-2 opacity-50" />
+                      <p className="font-bold">{isBn ? 'এই ক্যাটাগরিতে কোনো ঋণ আবেদন নেই' : 'No loan applications found in this filter'}</p>
+                    </div>
                   )}
-                  {isAdmin && <button onClick={() => setEditingItem(loan)} className="p-2 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-colors"><Edit2 size={18} /></button>}
-                  {isAdmin && loan.status !== 'approved' && <button onClick={() => updateDoc(doc(db, 'loanApplications', loan.id), { status: 'approved', approvalDate: serverTimestamp() })} className="px-3 py-1 bg-green-50 text-green-600 rounded-lg text-xs font-bold hover:bg-green-100 transition-all">Approve</button>}
-                  {isAdmin && <button onClick={() => handleDelete(loan.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>}
                 </div>
+
+                {/* Selected Loan Details Modal */}
+                {selectedLoanDetails && (
+                  <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-6 shadow-2xl border border-[#E0E8E0]"
+                    >
+                      <div className="flex items-center justify-between pb-4 border-b border-[#E0E8E0]">
+                        <div>
+                          <h3 className="text-xl font-black text-[#1B301B]">
+                            {isBn ? 'বন্ধু ঋণ আবেদন বিস্তারিত' : 'Loan Application Details'}
+                          </h3>
+                          <p className="text-xs text-[#8BA88B]">Loan ID: <span className="font-mono font-bold text-[#1B301B]">{selectedLoanDetails.loanId || selectedLoanDetails.id}</span></p>
+                        </div>
+                        <button onClick={() => setSelectedLoanDetails(null)} className="p-2 hover:bg-[#F0F5F0] rounded-full transition-colors">
+                          <X size={20} />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <div className="bg-[#F9FBF9] p-4 rounded-2xl space-y-2 border border-[#E0E8E0]">
+                          <h4 className="font-bold text-[#1B301B] flex items-center gap-1.5"><Users size={16} className="text-[#4CAF50]" /> {isBn ? 'আবেদনকারীর তথ্য' : 'Applicant Info'}</h4>
+                          <p><strong>{isBn ? 'নাম:' : 'Name:'}</strong> {selectedLoanDetails.name || selectedLoanDetails.userName}</p>
+                          <p><strong>{isBn ? 'পিতা/স্বামীর নাম:' : 'Father/Husband:'}</strong> {selectedLoanDetails.fatherName || 'N/A'}</p>
+                          <p><strong>{isBn ? 'ফোন:' : 'Phone:'}</strong> {selectedLoanDetails.phone}</p>
+                          <p><strong>{isBn ? 'জাতীয় পরিচয়পত্র:' : 'NID:'}</strong> {selectedLoanDetails.nidNumber || 'N/A'}</p>
+                          <p><strong>{isBn ? 'জেলা ও উপজেলা:' : 'Address:'}</strong> {selectedLoanDetails.upazila ? `${selectedLoanDetails.upazila}, ` : ''}{selectedLoanDetails.district || 'N/A'}</p>
+                        </div>
+
+                        <div className="bg-[#F9FBF9] p-4 rounded-2xl space-y-2 border border-[#E0E8E0]">
+                          <h4 className="font-bold text-[#1B301B] flex items-center gap-1.5"><Landmark size={16} className="text-[#4CAF50]" /> {isBn ? 'ঋণ ও খামার বিবরণ' : 'Loan & Farming Details'}</h4>
+                          <p><strong>{isBn ? 'আবেদনকৃত ঋণ:' : 'Requested Amount:'}</strong> ৳{(parseFloat(selectedLoanDetails.amount) || 0).toLocaleString()}</p>
+                          <p><strong>{isBn ? 'অনুমোদিত ঋণ:' : 'Approved Amount:'}</strong> ৳{(parseFloat(selectedLoanDetails.approvedAmount || selectedLoanDetails.amount) || 0).toLocaleString()}</p>
+                          <p><strong>{isBn ? 'খামারের ধরন:' : 'Farming Sector:'}</strong> {selectedLoanDetails.farmingType || selectedLoanDetails.cropType || 'Agriculture'}</p>
+                          <p><strong>{isBn ? 'জমির পরিমাণ:' : 'Land Size:'}</strong> {selectedLoanDetails.landSize || 'N/A'}</p>
+                          <p><strong>{isBn ? 'মেয়াদ:' : 'Duration:'}</strong> {selectedLoanDetails.duration || '12'} Months</p>
+                        </div>
+
+                        <div className="bg-[#F9FBF9] p-4 rounded-2xl space-y-2 border border-[#E0E8E0]">
+                          <h4 className="font-bold text-[#1B301B] flex items-center gap-1.5"><CreditCard size={16} className="text-[#4CAF50]" /> {isBn ? 'ব্যাংক / মোবাইল ব্যাংকিং' : 'Banking / Payment'}</h4>
+                          <p><strong>{isBn ? 'ব্যাংক/পদ্ধতি:' : 'Bank/Method:'}</strong> {selectedLoanDetails.bankName || 'N/A'}</p>
+                          <p><strong>{isBn ? 'হিসাব/মোবাইল নং:' : 'Account/Mobile:'}</strong> {selectedLoanDetails.accountNumber || 'N/A'}</p>
+                          <p><strong>{isBn ? 'শাখা:' : 'Branch:'}</strong> {selectedLoanDetails.branchName || 'N/A'}</p>
+                        </div>
+
+                        <div className="bg-[#F9FBF9] p-4 rounded-2xl space-y-2 border border-[#E0E8E0]">
+                          <h4 className="font-bold text-[#1B301B] flex items-center gap-1.5"><Shield size={16} className="text-[#4CAF50]" /> {isBn ? 'জামিনদার ও রেফারেল' : 'Guarantor & Referral'}</h4>
+                          <p><strong>{isBn ? 'জামিনদারের নাম:' : 'Guarantor:'}</strong> {selectedLoanDetails.guarantorName || 'N/A'}</p>
+                          <p><strong>{isBn ? 'জামিনদারের ফোন:' : 'Phone:'}</strong> {selectedLoanDetails.guarantorPhone || 'N/A'}</p>
+                          <p><strong>{isBn ? 'রেফারেল এজেন্ট:' : 'Agent Referral:'}</strong> {selectedLoanDetails.referredByAgentName ? `${selectedLoanDetails.referredByAgentName} (${selectedLoanDetails.referredByAgentId})` : 'Direct'}</p>
+                        </div>
+                      </div>
+
+                      {/* NID Documents Preview */}
+                      {(selectedLoanDetails.nidFront || selectedLoanDetails.nidBack) && (
+                        <div className="space-y-2">
+                          <h4 className="font-bold text-sm text-[#1B301B]">{isBn ? 'সংযুক্ত এনআইডি কার্ড ডকুমেন্ট' : 'Attached NID Documents'}</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {selectedLoanDetails.nidFront && (
+                              <div className="space-y-1">
+                                <span className="text-xs text-[#8BA88B] font-bold">{isBn ? 'সামনের অংশ (Front Side)' : 'Front Side'}</span>
+                                <a href={selectedLoanDetails.nidFront} target="_blank" rel="noreferrer">
+                                  <img src={selectedLoanDetails.nidFront} alt="NID Front" className="w-full h-40 object-cover rounded-2xl border border-[#E0E8E0] hover:opacity-90" />
+                                </a>
+                              </div>
+                            )}
+                            {selectedLoanDetails.nidBack && (
+                              <div className="space-y-1">
+                                <span className="text-xs text-[#8BA88B] font-bold">{isBn ? 'পেছনের অংশ (Back Side)' : 'Back Side'}</span>
+                                <a href={selectedLoanDetails.nidBack} target="_blank" rel="noreferrer">
+                                  <img src={selectedLoanDetails.nidBack} alt="NID Back" className="w-full h-40 object-cover rounded-2xl border border-[#E0E8E0] hover:opacity-90" />
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-end gap-3 pt-4 border-t border-[#E0E8E0]">
+                        <button
+                          onClick={() => setSelectedLoanDetails(null)}
+                          className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-bold text-sm transition-all"
+                        >
+                          {isBn ? 'বন্ধ করুন' : 'Close'}
+                        </button>
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
               </div>
-            ))}
+            )}
 
             {activeTab === 'loan-payments' && filterData(loanPayments).map(pay => (
               <div key={pay.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4 border-l-4 border-l-[#4CAF50]">

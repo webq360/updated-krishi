@@ -475,18 +475,62 @@ export function Form({ type, initialData, onSave, onCancel, speciesList }: any) 
         </>
       )}
 
-      {(type === 'loans' || type === 'protections' || type === 'pona' || type === 'training' || type === 'exports') && (
+      {type === 'loans' && (
+        <>
+          <Input label="Applicant Name" value={formData.name || formData.userName} onChange={(v: string) => setFormData({...formData, name: v, userName: v})} required />
+          <Input label="Father's / Husband's Name" value={formData.fatherName} onChange={(v: string) => setFormData({...formData, fatherName: v})} />
+          <Input label="Phone Number" value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} required />
+          <Input label="NID Number" value={formData.nidNumber} onChange={(v: string) => setFormData({...formData, nidNumber: v})} />
+          <Input label="Requested Amount (TK)" value={formData.amount} onChange={(v: string) => setFormData({...formData, amount: v})} required />
+          <Input label="Approved Amount (TK)" value={formData.approvedAmount} onChange={(v: string) => setFormData({...formData, approvedAmount: v})} />
+          <Input label="Loan Duration (Months)" value={formData.duration} onChange={(v: string) => setFormData({...formData, duration: v})} />
+          <Select 
+            label="Farming Sector" 
+            value={formData.farmingType || formData.cropType} 
+            onChange={(v: string) => setFormData({...formData, farmingType: v, cropType: v})} 
+            options={[
+              { label: 'Crop Cultivation (ফসল চাষ)', value: 'Crop' },
+              { label: 'Dairy & Cattle (দুগ্ধ ও গবাদিপশু)', value: 'Dairy' },
+              { label: 'Poultry Farming (পোল্ট্রি খামার)', value: 'Poultry' },
+              { label: 'Fisheries (মৎস্য চাষ)', value: 'Fishery' },
+              { label: 'Agricultural Machinery (কৃষি যন্ত্রপাতি)', value: 'Machinery' }
+            ]} 
+          />
+          <Input label="Land / Farm Size" value={formData.landSize} onChange={(v: string) => setFormData({...formData, landSize: v})} />
+          <Select 
+            label="District" 
+            value={formData.district} 
+            onChange={(v: string) => setFormData({...formData, district: v})} 
+            options={BANGLADESH_DISTRICTS.map(d => ({ label: d, value: d }))} 
+          />
+          <Input label="Upazila" value={formData.upazila} onChange={(v: string) => setFormData({...formData, upazila: v})} />
+          <Select 
+            label="Application Status" 
+            value={formData.status} 
+            onChange={(v: string) => setFormData({...formData, status: v})} 
+            options={[
+              { label: 'Pending (অপেক্ষমাণ)', value: 'pending' },
+              { label: 'Approved (অনুমোদিত)', value: 'approved' },
+              { label: 'Disbursed (বিতরণকৃত)', value: 'disbursed' },
+              { label: 'Completed (পরিশোধিত)', value: 'completed' },
+              { label: 'Rejected (বাতিল)', value: 'rejected' }
+            ]} 
+            required
+          />
+          <Input label="Bank / Mobile Banking Name" value={formData.bankName} onChange={(v: string) => setFormData({...formData, bankName: v})} />
+          <Input label="Account / Mobile Number" value={formData.accountNumber} onChange={(v: string) => setFormData({...formData, accountNumber: v})} />
+          <Input label="Guarantor Name" value={formData.guarantorName} onChange={(v: string) => setFormData({...formData, guarantorName: v})} />
+          <Input label="Guarantor Phone" value={formData.guarantorPhone} onChange={(v: string) => setFormData({...formData, guarantorPhone: v})} />
+          <ImageUploadInput label="NID Front Photo" value={formData.nidFront} onChange={(v: string) => setFormData({...formData, nidFront: v})} folder="krishi-loans" />
+          <ImageUploadInput label="NID Back Photo" value={formData.nidBack} onChange={(v: string) => setFormData({...formData, nidBack: v})} folder="krishi-loans" />
+          <Textarea label="Admin Remarks / Notes" value={formData.details || formData.notes} onChange={(v: string) => setFormData({...formData, details: v, notes: v})} className="md:col-span-2" />
+        </>
+      )}
+
+      {(type === 'protections' || type === 'pona' || type === 'training' || type === 'exports') && (
         <>
           <Input label="User Name" value={formData.userName || formData.name} onChange={(v: string) => setFormData({...formData, userName: v, name: v})} required />
           <Input label="Phone" value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} required />
-          {type === 'loans' && (
-            <>
-              <Input label="Requested Amount (TK)" value={formData.amount} onChange={(v: string) => setFormData({...formData, amount: v})} required />
-              <Input label="Approved Amount (TK)" value={formData.approvedAmount} onChange={(v: string) => setFormData({...formData, approvedAmount: v})} />
-              <Input label="District" value={formData.district} onChange={(v: string) => setFormData({...formData, district: v})} />
-              <Input label="Upazila" value={formData.upazila} onChange={(v: string) => setFormData({...formData, upazila: v})} />
-            </>
-          )}
           {type === 'protections' && (
             <>
               <Input label="Crop Type" value={formData.cropType} onChange={(v: string) => setFormData({...formData, cropType: v})} required />
