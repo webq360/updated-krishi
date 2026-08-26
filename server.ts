@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import fs from "fs/promises";
 import { app } from "./api/index";
-
 const PORT = Number(process.env.PORT) || 3000;
 
 async function start() {

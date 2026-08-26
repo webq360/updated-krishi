@@ -793,24 +793,101 @@ export default function AdminPanel() {
   }, [navigate]);
 
   useEffect(() => {
-    // We need the session flag to be ready.
-    // If auth.currentUser is missing, we wait for it to avoid permission errors
-    // unless we are specifically handling unauthenticated access (which we aren't for users/online)
-    if (!(isAdmin || isManager) || !auth.currentUser) return;
+    if (!isAdmin && !isManager) return;
 
     const unsubSpecies = onSnapshot(collection(db, 'species'), (s) => setSpecies(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'species'));
     const unsubDiseases = onSnapshot(collection(db, 'diseases'), (s) => setDiseases(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'diseases'));
     const unsubProducts = onSnapshot(collection(db, 'products'), (s) => setProducts(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'products'));
     const unsubMarket = onSnapshot(collection(db, 'marketPrices'), (s) => setMarketPrices(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'marketPrices'));
     const unsubCalendar = onSnapshot(collection(db, 'cropCalendar'), (s) => setCropCalendar(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'cropCalendar'));
-    const unsubUsers = onSnapshot(collection(db, 'users'), (s) => setUsers(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'users'));
+
+    // 1. Listen to users collection
+    const unsubUsers = onSnapshot(collection(db, 'users'), (s) => {
+      const firestoreUsers = s.docs.map(d => ({ id: d.id, ...d.data() }));
+      setUsers(prev => {
+        const map = new Map();
+        (firestoreUsers || []).forEach(u => map.set(u.id, u));
+        (prev || []).forEach(u => { if (!map.has(u.id)) map.set(u.id, u); });
+        return Array.from(map.values());
+      });
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'users'));
+
+    // 2. Fetch all registered users from MongoDB
+    const fetchMongoUsers = async () => {
+      try {
+        const token = safeLocalStorage.getItem('authToken');
+        const res = await fetch('/api/admin/users', {
+          headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+        });
+        if (res.ok) {
+          const mongoUsers = await res.json();
+          if (Array.isArray(mongoUsers) && mongoUsers.length > 0) {
+            setUsers(prev => {
+              const map = new Map();
+              (prev || []).forEach(u => map.set(u.id || u._id, u));
+              mongoUsers.forEach((u: any) => map.set(u._id || u.id, { id: u._id || u.id, ...u }));
+              return Array.from(map.values());
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Fetch MongoDB users error:', err);
+      }
+    };
+    fetchMongoUsers();
+    const userSyncInterval = setInterval(fetchMongoUsers, 20000);
+
+    // 3. Online Users Tracker & Listener
+    const syncOnline = async () => {
+      try {
+        const res = await fetch('/api/data/onlineUsers?limit=100');
+        if (res.ok) {
+          const list = await res.json();
+          const now = Date.now();
+          const active = (list || []).filter((u: any) => {
+            const time = typeof u.lastSeen === 'number' ? u.lastSeen : (u.lastSeen?.toMillis ? u.lastSeen.toMillis() : new Date(u.lastSeen || u.updatedAt || 0).getTime());
+            return time > (now - 300000); // within 5 minutes
+          });
+          setOnlineUsers(active);
+        }
+      } catch {}
+    };
+    syncOnline();
+    const onlineInterval = setInterval(syncOnline, 10000);
+
     const unsubOnline = onSnapshot(collection(db, 'onlineUsers'), (s) => {
       const now = Date.now();
       const online = s.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .filter((u: any) => u.lastSeen && typeof u.lastSeen.toMillis === 'function' && u.lastSeen.toMillis() > now - 300000); // Online if seen in last 5 mins
-      setOnlineUsers(online);
+        .filter((u: any) => {
+          const time = typeof u.lastSeen === 'number' ? u.lastSeen : (u.lastSeen?.toMillis ? u.lastSeen.toMillis() : new Date(u.lastSeen || u.updatedAt || 0).getTime());
+          return time > (now - 300000);
+        });
+      if (online.length > 0) {
+        setOnlineUsers(online);
+      }
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'onlineUsers'));
+
+    // 4. Admin Heartbeat
+    let adminClientId = safeLocalStorage.getItem('presence_client_id') || 'admin_' + Math.random().toString(36).substring(2, 9);
+    safeLocalStorage.setItem('presence_client_id', adminClientId);
+    const sendAdminHeartbeat = async () => {
+      try {
+        await fetch(`/api/data/onlineUsers/${adminClientId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: adminClientId,
+            name: isBn ? 'সিস্টেম অ্যাডমিন (প্যানেল)' : 'System Admin (Panel)',
+            role: 'admin',
+            lastSeen: Date.now(),
+            lastSeenDate: new Date().toISOString(),
+          }),
+        });
+      } catch {}
+    };
+    sendAdminHeartbeat();
+    const adminHeartbeatInterval = setInterval(sendAdminHeartbeat, 30000);
 
     const unsubStories = onSnapshot(collection(db, 'stories'), (s) => setStories(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'stories'));
     const unsubProblems = onSnapshot(collection(db, 'problemLogs'), (s) => setProblems(s.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => handleFirestoreError(err, OperationType.LIST, 'problemLogs'));
@@ -871,8 +948,11 @@ export default function AdminPanel() {
       unsubVideos();
       unsubAgentApps();
       unsubNotifs();
+      clearInterval(userSyncInterval);
+      clearInterval(onlineInterval);
+      clearInterval(adminHeartbeatInterval);
     };
-  }, [isAdmin, auth.currentUser]); // Add auth.currentUser to dependencies
+  }, [isAdmin, isManager, isBn]);
 
   const handleSave = async (data: any) => {
     try {
@@ -1336,6 +1416,69 @@ export default function AdminPanel() {
                 </div>
               </div>
             ))}
+
+            {activeTab === 'online' && (
+              <div className="p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-[#1B301B]">
+                    {isBn ? 'লাইভ সক্রিয় ইউজার তালিকা' : 'Active Online Users Live'} ({onlineUsers.length})
+                  </h3>
+                  <span className="flex items-center gap-2 text-xs text-green-600 font-bold bg-green-50 px-3 py-1 rounded-full border border-green-200">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    {isBn ? 'রিয়েল-টাইম উপস্থিতি' : 'Real-time Activity'}
+                  </span>
+                </div>
+                <div className="bg-white rounded-2xl border border-[#E0E8E0] overflow-hidden shadow-sm">
+                  <div className="p-4 bg-[#F9FBF9] border-b border-[#E0E8E0] grid grid-cols-4 font-bold text-xs text-[#556B55] uppercase tracking-wider">
+                    <span>{isBn ? 'ইউজার / ব্রাউজার' : 'User / Device'}</span>
+                    <span>{isBn ? 'রোল' : 'Role'}</span>
+                    <span>{isBn ? 'সর্বশেষ উপস্থিতি' : 'Last Seen'}</span>
+                    <span className="text-right">{isBn ? 'স্ট্যাটাস' : 'Status'}</span>
+                  </div>
+                  <div className="divide-y divide-[#E0E8E0]">
+                    {onlineUsers.length === 0 ? (
+                      <div className="p-8 text-center text-sm text-[#556B55]">
+                        {isBn ? 'বর্তমানে কোনো সক্রিয় ইউজার নেই' : 'No active online users right now'}
+                      </div>
+                    ) : (
+                      filterData(onlineUsers).map((u: any) => (
+                        <div key={u.id} className="p-4 grid grid-cols-4 items-center text-sm hover:bg-[#F9FBF9] transition-colors">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-[#E8F5E9] text-[#2E7D32] font-black flex items-center justify-center text-xs">
+                              {u.name?.charAt(0) || 'U'}
+                            </div>
+                            <div>
+                              <p className="font-bold text-[#1B301B]">{u.name || 'Active User'}</p>
+                              {u.phone && <p className="text-[11px] text-[#8BA88B]">{u.phone}</p>}
+                            </div>
+                          </div>
+                          <div>
+                            <span className={cn(
+                              "px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider",
+                              u.role === 'admin' ? "bg-purple-100 text-purple-700 border border-purple-200" :
+                              u.role === 'agent' ? "bg-amber-100 text-amber-700 border border-amber-200" :
+                              "bg-blue-50 text-blue-700 border border-blue-100"
+                            )}>
+                              {u.role || 'user'}
+                            </span>
+                          </div>
+                          <div className="text-xs text-[#556B55]">
+                            {u.lastSeenDate ? new Date(u.lastSeenDate).toLocaleTimeString() : (isBn ? 'সক্রিয়' : 'Active now')}
+                          </div>
+                          <div className="flex justify-end">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-[11px] font-bold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-ping" />
+                              {isBn ? 'অনলাইন' : 'Online'}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'users' && filterData(users).map(u => <UserItem key={u.id} user={u} onUpdateRole={(role: string) => updateDoc(doc(db, 'users', u.id), { role })} isAdmin={isAdmin} />)}
             
             {activeTab === 'settings' && isAdmin && (

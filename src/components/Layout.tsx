@@ -117,6 +117,44 @@ export function Layout({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Online Presence Heartbeat Tracker
+  useEffect(() => {
+    let clientId = safeLocalStorage.getItem('presence_client_id');
+    if (!clientId) {
+      clientId = 'client_' + Math.random().toString(36).substring(2, 11);
+      safeLocalStorage.setItem('presence_client_id', clientId);
+    }
+
+    const sendHeartbeat = async () => {
+      try {
+        const userStr = safeLocalStorage.getItem('user');
+        let userInfo: any = {};
+        if (userStr) {
+          try { userInfo = JSON.parse(userStr); } catch {}
+        }
+
+        await fetch(`/api/data/onlineUsers/${clientId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: clientId,
+            name: userInfo.name || userInfo.email || (i18n.language === 'en' ? 'Active Farmer' : 'সক্রিয় কৃষক'),
+            role: userInfo.role || 'user',
+            phone: userInfo.phone || '',
+            address: userInfo.address || '',
+            lastSeen: Date.now(),
+            lastSeenDate: new Date().toISOString(),
+          }),
+        });
+      } catch {}
+    };
+
+    sendHeartbeat();
+    const presenceInterval = setInterval(sendHeartbeat, 30000);
+
+    return () => clearInterval(presenceInterval);
+  }, [userProfile, i18n.language]);
+
   useEffect(() => {
     refreshWeather(userProfile?.address || 'Dhaka');
   }, [userProfile?.address]);
