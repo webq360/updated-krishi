@@ -100,6 +100,8 @@ export default function AdminPanel() {
   const [selectedProtectionDetails, setSelectedProtectionDetails] = useState<any>(null);
   const [protectionUpdateCropFilter, setProtectionUpdateCropFilter] = useState<string>('all');
   const [selectedProtectionUpdate, setSelectedProtectionUpdate] = useState<any>(null);
+  const [ponaStatusFilter, setPonaStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'shipping' | 'completed' | 'cancelled'>('all');
+  const [selectedPonaOrderDetails, setSelectedPonaOrderDetails] = useState<any>(null);
   
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -2734,29 +2736,297 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {activeTab === 'pona' && filterData(ponaOrders).map(o => (
-              <div key={o.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <ShoppingBag size={18} className="text-[#4CAF50]" />
-                    <h4 className="font-bold text-lg">{o.userName}</h4>
-                    <span className={cn(
-                      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
-                      o.status === 'completed' ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
-                    )}>{o.status}</span>
+            {activeTab === 'pona' && (
+              <div className="p-6 space-y-6">
+                {/* Pona Orders KPI Overview Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-5 rounded-2xl border border-blue-200">
+                    <p className="text-xs font-bold text-blue-700 uppercase tracking-wider">{isBn ? 'মোট পোনা ও চারা অর্ডার' : 'Total Orders'}</p>
+                    <h3 className="text-2xl font-black text-blue-900 mt-1">{ponaOrders.length}</h3>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm text-[#556B55]">
-                    <p><strong>Category:</strong> {o.category}</p>
-                    <p><strong>Phone:</strong> {o.phone}</p>
+                  <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-5 rounded-2xl border border-amber-200">
+                    <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">{isBn ? 'অপেক্ষমাণ অর্ডার' : 'Pending Orders'}</p>
+                    <h3 className="text-2xl font-black text-amber-900 mt-1">{ponaOrders.filter(o => !o.status || o.status === 'pending').length}</h3>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-5 rounded-2xl border border-purple-200">
+                    <p className="text-xs font-bold text-purple-700 uppercase tracking-wider">{isBn ? 'শিপিং / প্রসেসিং' : 'In Shipping'}</p>
+                    <h3 className="text-2xl font-black text-purple-900 mt-1">{ponaOrders.filter(o => o.status === 'shipping' || o.status === 'confirmed').length}</h3>
+                  </div>
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-5 rounded-2xl border border-green-200">
+                    <p className="text-xs font-bold text-green-700 uppercase tracking-wider">{isBn ? 'সরবরাহ সম্পন্ন' : 'Completed Deliveries'}</p>
+                    <h3 className="text-2xl font-black text-green-900 mt-1">{ponaOrders.filter(o => o.status === 'completed').length}</h3>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  {isAdmin && <button onClick={() => setEditingItem(o)} className="p-2 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-colors"><Edit2 size={18} /></button>}
-                  {isAdmin && <button onClick={() => updateDoc(doc(db, 'ponaOrders', o.id), { status: 'completed' })} className="px-3 py-1 bg-green-50 text-green-600 rounded-lg text-xs font-bold hover:bg-green-100 transition-all">Complete</button>}
-                  {isAdmin && <button onClick={() => handleDelete(o.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>}
+
+                {/* Filter Pills */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                      { key: 'all', label: isBn ? 'সকল অর্ডার' : 'All Orders', count: ponaOrders.length },
+                      { key: 'pending', label: isBn ? 'অপেক্ষমাণ' : 'Pending', count: ponaOrders.filter(o => !o.status || o.status === 'pending').length },
+                      { key: 'confirmed', label: isBn ? 'নিশ্চিতকৃত' : 'Confirmed', count: ponaOrders.filter(o => o.status === 'confirmed').length },
+                      { key: 'shipping', label: isBn ? 'শিপিং-এ আছে' : 'Shipping', count: ponaOrders.filter(o => o.status === 'shipping').length },
+                      { key: 'completed', label: isBn ? 'সম্পন্ন' : 'Completed', count: ponaOrders.filter(o => o.status === 'completed').length },
+                      { key: 'cancelled', label: isBn ? 'বাতিল' : 'Cancelled', count: ponaOrders.filter(o => o.status === 'cancelled').length },
+                    ].map(f => (
+                      <button
+                        key={f.key}
+                        onClick={() => setPonaStatusFilter(f.key as any)}
+                        className={cn(
+                          "px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border",
+                          ponaStatusFilter === f.key 
+                            ? "bg-[#4CAF50] text-white border-[#4CAF50] shadow-md shadow-green-900/20"
+                            : "bg-white text-[#556B55] border-[#E0E8E0] hover:bg-[#F0F5F0]"
+                        )}
+                      >
+                        <span>{f.label}</span>
+                        <span className={cn(
+                          "px-1.5 py-0.2 rounded-full text-[10px] font-black",
+                          ponaStatusFilter === f.key ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
+                        )}>{f.count}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                {/* Orders List */}
+                <div className="space-y-4">
+                  {filterData(ponaOrders)
+                    .filter(o => {
+                      if (ponaStatusFilter === 'all') return true;
+                      return (o.status || 'pending').toLowerCase() === ponaStatusFilter;
+                    })
+                    .map(o => (
+                      <div key={o.id} className="p-6 bg-white rounded-2xl border border-[#E0E8E0] hover:border-[#4CAF50] transition-all shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                        <div className="space-y-3 flex-1">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center font-black">
+                              <ShoppingBag size={20} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-lg text-[#1B301B]">{o.userName || o.name || 'Farmer Buyer'}</h4>
+                                <span className={cn(
+                                  "px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider",
+                                  o.status === 'completed' ? "bg-green-100 text-green-700 border border-green-200" :
+                                  o.status === 'shipping' ? "bg-purple-100 text-purple-700 border border-purple-200" :
+                                  o.status === 'confirmed' ? "bg-blue-100 text-blue-700 border border-blue-200" :
+                                  o.status === 'cancelled' ? "bg-red-100 text-red-700 border border-red-200" :
+                                  "bg-amber-100 text-amber-800 border border-amber-200"
+                                )}>
+                                  {o.status || 'pending'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-[#8BA88B] font-mono mt-0.5">
+                                Order ID: <span className="font-bold text-[#1B301B]">{o.id}</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 text-xs text-[#556B55] bg-[#F9FBF9] p-3 rounded-xl border border-[#E0E8E0]">
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'অর্ডারের ধরন:' : 'Category:'}</span>
+                              <strong className="text-sm text-[#1B301B]">{o.category}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'জাত / ভ্যারাইটি:' : 'Variety:'}</span>
+                              <strong className="text-sm text-blue-700">{o.variety || 'Standard'}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'পরিমাণ:' : 'Quantity:'}</span>
+                              <strong className="text-sm text-[#1B301B]">{o.quantity || 'N/A'}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'ফোন নম্বর:' : 'Phone:'}</span>
+                              <span className="font-bold text-[#1B301B]">{o.phone}</span>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'মোট মূল্য:' : 'Total Price:'}</span>
+                              <span className="font-bold text-emerald-700">{o.totalPrice || o.price ? `৳${parseFloat(o.totalPrice || o.price).toLocaleString()}` : 'Negotiable'}</span>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'ডেলিভারি এলাকা:' : 'Location:'}</span>
+                              <span>{o.upazila ? `${o.upazila}, ` : ''}{o.district || 'Bangladesh'}</span>
+                            </div>
+                            <div className="sm:col-span-2">
+                              <span className="text-[#8BA88B] block">{isBn ? 'রেফারেল এজেন্ট:' : 'Referred Agent:'}</span>
+                              <span className="font-semibold text-emerald-800">{o.agentName ? `${o.agentName} (${o.agentId})` : (o.agentId || 'Direct')}</span>
+                            </div>
+                            {o.details && (
+                              <div className="col-span-full pt-1 border-t border-gray-200">
+                                <span className="text-[#8BA88B] block">{isBn ? 'ঠিকানা ও স্পেসিফিকেশন:' : 'Address & Notes:'}</span>
+                                <p className="text-xs text-[#1B301B]">{o.details}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-wrap lg:flex-col items-end gap-2 shrink-0 border-t lg:border-t-0 pt-3 lg:pt-0">
+                          <button
+                            onClick={() => setSelectedPonaOrderDetails(o)}
+                            className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all flex items-center gap-1"
+                          >
+                            <Info size={14} />
+                            {isBn ? 'বিস্তারিত' : 'Details'}
+                          </button>
+
+                          {isAdmin && (
+                            <div className="flex items-center gap-2">
+                              {o.status !== 'confirmed' && o.status !== 'shipping' && o.status !== 'completed' && (
+                                <button 
+                                  onClick={async () => {
+                                    await updateDoc(doc(db, 'ponaOrders', o.id), { status: 'confirmed' });
+                                    await addDoc(collection(db, 'notifications'), {
+                                      userId: o.userId || '',
+                                      title: 'পোনা/চারা অর্ডার কনফার্ম হয়েছে',
+                                      message: `আপনার ${o.category} অর্ডারের জন্য বুকিং নিশ্চিত করা হয়েছে।`,
+                                      type: 'order',
+                                      createdAt: serverTimestamp()
+                                    });
+                                  }} 
+                                  className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all flex items-center gap-1 shadow-sm"
+                                >
+                                  <CheckCircle2 size={14} />
+                                  {isBn ? 'কনফার্ম' : 'Confirm'}
+                                </button>
+                              )}
+
+                              {o.status === 'confirmed' && (
+                                <button 
+                                  onClick={() => updateDoc(doc(db, 'ponaOrders', o.id), { status: 'shipping' })}
+                                  className="px-3 py-1.5 bg-purple-600 text-white rounded-xl text-xs font-bold hover:bg-purple-700 transition-all"
+                                >
+                                  {isBn ? 'শিপিং মার্ক' : 'Ship Order'}
+                                </button>
+                              )}
+
+                              {o.status !== 'completed' && (
+                                <button 
+                                  onClick={() => updateDoc(doc(db, 'ponaOrders', o.id), { status: 'completed' })}
+                                  className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all"
+                                >
+                                  {isBn ? 'সরবরাহ সম্পন্ন' : 'Complete'}
+                                </button>
+                              )}
+
+                              {o.status !== 'cancelled' && (
+                                <button 
+                                  onClick={async () => {
+                                    if (confirm(isBn ? 'আপনি কি এই অর্ডারটি বাতিল করতে চান?' : 'Are you sure you want to cancel this order?')) {
+                                      await updateDoc(doc(db, 'ponaOrders', o.id), { status: 'cancelled' });
+                                    }
+                                  }} 
+                                  className="px-2.5 py-1.5 bg-red-50 text-red-600 rounded-xl text-xs font-bold hover:bg-red-100 transition-all"
+                                >
+                                  {isBn ? 'বাতিল' : 'Cancel'}
+                                </button>
+                              )}
+
+                              <button onClick={() => setEditingItem(o)} className="p-1.5 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-colors">
+                                <Edit2 size={16} />
+                              </button>
+                              <button onClick={() => handleDelete(o.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                  {filterData(ponaOrders).filter(o => ponaStatusFilter === 'all' || (o.status || 'pending').toLowerCase() === ponaStatusFilter).length === 0 && (
+                    <div className="p-12 text-center text-[#556B55] bg-white rounded-2xl border border-dashed border-[#E0E8E0]">
+                      <ShoppingBag size={36} className="mx-auto text-[#8BA88B] mb-2 opacity-50" />
+                      <p className="font-bold">{isBn ? 'এই ফিল্টারে কোনো পোনা বা চারা অর্ডার নেই' : 'No seedling or pona orders found in this filter'}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected Pona Order Details Modal */}
+                {selectedPonaOrderDetails && (
+                  <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-6 shadow-2xl border border-[#E0E8E0]"
+                    >
+                      <div className="flex items-center justify-between pb-4 border-b border-[#E0E8E0]">
+                        <div>
+                          <h3 className="text-xl font-black text-[#1B301B]">
+                            {isBn ? 'পোনা ও চারা অর্ডার বিস্তারিত' : 'Pona & Seedling Order Details'}
+                          </h3>
+                          <p className="text-xs text-[#8BA88B]">Order ID: <span className="font-mono font-bold text-[#1B301B]">{selectedPonaOrderDetails.id}</span></p>
+                        </div>
+                        <button onClick={() => setSelectedPonaOrderDetails(null)} className="p-2 hover:bg-[#F0F5F0] rounded-full transition-colors">
+                          <X size={20} />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <div className="bg-[#F9FBF9] p-4 rounded-2xl space-y-2 border border-[#E0E8E0]">
+                          <h4 className="font-bold text-[#1B301B] flex items-center gap-1.5"><Users size={16} className="text-[#4CAF50]" /> {isBn ? 'ক্রেতা / কৃষকের তথ্য' : 'Customer Info'}</h4>
+                          <p><strong>{isBn ? 'নাম:' : 'Name:'}</strong> {selectedPonaOrderDetails.userName || selectedPonaOrderDetails.name}</p>
+                          <p><strong>{isBn ? 'ফোন:' : 'Phone:'}</strong> {selectedPonaOrderDetails.phone}</p>
+                          <p><strong>{isBn ? 'ডেলিভারি এলাকা:' : 'Delivery Location:'}</strong> {selectedPonaOrderDetails.upazila ? `${selectedPonaOrderDetails.upazila}, ` : ''}{selectedPonaOrderDetails.district || 'Bangladesh'}</p>
+                          <p><strong>{isBn ? 'রেফারেল এজেন্ট:' : 'Referred Agent:'}</strong> {selectedPonaOrderDetails.agentName ? `${selectedPonaOrderDetails.agentName} (${selectedPonaOrderDetails.agentId})` : (selectedPonaOrderDetails.agentId || 'Direct')}</p>
+                        </div>
+
+                        <div className="bg-[#F9FBF9] p-4 rounded-2xl space-y-2 border border-[#E0E8E0]">
+                          <h4 className="font-bold text-[#1B301B] flex items-center gap-1.5"><ShoppingBag size={16} className="text-[#4CAF50]" /> {isBn ? 'অর্ডার ও পণ্যের বিবরণ' : 'Order Details'}</h4>
+                          <p><strong>{isBn ? 'ক্যাটাগরি:' : 'Category:'}</strong> {selectedPonaOrderDetails.category}</p>
+                          <p><strong>{isBn ? 'জাত / ভ্যারাইটি:' : 'Variety:'}</strong> {selectedPonaOrderDetails.variety || 'Standard'}</p>
+                          <p><strong>{isBn ? 'পরিমাণ:' : 'Quantity:'}</strong> {selectedPonaOrderDetails.quantity || 'N/A'}</p>
+                          <p><strong>{isBn ? 'মোট মূল্য:' : 'Total Price:'}</strong> {selectedPonaOrderDetails.totalPrice || selectedPonaOrderDetails.price ? `৳${parseFloat(selectedPonaOrderDetails.totalPrice || selectedPonaOrderDetails.price).toLocaleString()}` : 'Negotiable'}</p>
+                          <p><strong>{isBn ? 'স্ট্যাটাস:' : 'Status:'}</strong> <span className="font-bold uppercase text-emerald-700">{selectedPonaOrderDetails.status || 'pending'}</span></p>
+                        </div>
+                      </div>
+
+                      {selectedPonaOrderDetails.details && (
+                        <div className="bg-[#F9FBF9] p-4 rounded-2xl border border-[#E0E8E0]">
+                          <h4 className="font-bold text-xs text-[#8BA88B] mb-1">{isBn ? 'ডেলিভারি ঠিকানা ও গ্রাহকের নোট:' : 'Delivery Address & Notes:'}</h4>
+                          <p className="text-sm text-[#1B301B] leading-relaxed">{selectedPonaOrderDetails.details}</p>
+                        </div>
+                      )}
+
+                      {/* NID Documents Preview */}
+                      {(selectedPonaOrderDetails.nidFront || selectedPonaOrderDetails.nidBack) && (
+                        <div className="space-y-2">
+                          <h4 className="font-bold text-sm text-[#1B301B]">{isBn ? 'সংযুক্ত এনআইডি কার্ড ডকুমেন্ট' : 'Attached NID Documents'}</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {selectedPonaOrderDetails.nidFront && (
+                              <div className="space-y-1">
+                                <span className="text-xs text-[#8BA88B] font-bold">{isBn ? 'সামনের অংশ (Front Side)' : 'Front Side'}</span>
+                                <a href={selectedPonaOrderDetails.nidFront} target="_blank" rel="noreferrer">
+                                  <img src={selectedPonaOrderDetails.nidFront} alt="NID Front" className="w-full h-40 object-cover rounded-2xl border border-[#E0E8E0] hover:opacity-90" />
+                                </a>
+                              </div>
+                            )}
+                            {selectedPonaOrderDetails.nidBack && (
+                              <div className="space-y-1">
+                                <span className="text-xs text-[#8BA88B] font-bold">{isBn ? 'পেছনের অংশ (Back Side)' : 'Back Side'}</span>
+                                <a href={selectedPonaOrderDetails.nidBack} target="_blank" rel="noreferrer">
+                                  <img src={selectedPonaOrderDetails.nidBack} alt="NID Back" className="w-full h-40 object-cover rounded-2xl border border-[#E0E8E0] hover:opacity-90" />
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-end gap-3 pt-4 border-t border-[#E0E8E0]">
+                        <button
+                          onClick={() => setSelectedPonaOrderDetails(null)}
+                          className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-bold text-sm transition-all"
+                        >
+                          {isBn ? 'বন্ধ করুন' : 'Close'}
+                        </button>
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
               </div>
-            ))}
+            )}
 
             {activeTab === 'training' && filterData(trainingApps).map(a => (
               <div key={a.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">

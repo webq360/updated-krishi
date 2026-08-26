@@ -631,23 +631,57 @@ export function Form({ type, initialData, onSave, onCancel, speciesList }: any) 
         </>
       )}
 
-      {(type === 'pona' || type === 'training' || type === 'exports') && (
+      {type === 'pona' && (
+        <>
+          <Input label="Customer / Farmer Name" value={formData.userName || formData.name} onChange={(v: string) => setFormData({...formData, userName: v, name: v})} required />
+          <Input label="Phone Number" value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} required />
+          <Select 
+            label="Order Category" 
+            value={formData.category} 
+            onChange={(v: string) => setFormData({...formData, category: v})} 
+            options={[
+              { label: 'Fish Pona (মাছের পোনা)', value: 'Fish' },
+              { label: 'Poultry Chicks (মুরগীর বাচ্চা)', value: 'Poultry Chicks' },
+              { label: 'Livestock Calves (উন্নত জাতের বাছুর)', value: 'Calves' },
+              { label: 'Shrimp PL (চিংড়ি পোনা)', value: 'Shrimp' },
+              { label: 'Crop Seedlings / Chara (উন্নত চারা)', value: 'Seedlings' }
+            ]} 
+            required
+          />
+          <Input label="Breed / Variety / Details" value={formData.variety} onChange={(v: string) => setFormData({...formData, variety: v})} />
+          <Input label="Quantity (সংখ্যা / পরিমাণ)" value={formData.quantity} onChange={(v: string) => setFormData({...formData, quantity: v})} />
+          <Input label="Total Price (TK)" value={formData.totalPrice || formData.price} onChange={(v: string) => setFormData({...formData, totalPrice: v, price: v})} />
+          <Select 
+            label="District" 
+            value={formData.district} 
+            onChange={(v: string) => setFormData({...formData, district: v})} 
+            options={BANGLADESH_DISTRICTS.map(d => ({ label: d, value: d }))} 
+          />
+          <Input label="Upazila / Delivery Area" value={formData.upazila} onChange={(v: string) => setFormData({...formData, upazila: v})} />
+          <Select 
+            label="Order Status" 
+            value={formData.status} 
+            onChange={(v: string) => setFormData({...formData, status: v})} 
+            options={[
+              { label: 'Pending (অপেক্ষমাণ)', value: 'pending' },
+              { label: 'Confirmed (নিশ্চিতকৃত)', value: 'confirmed' },
+              { label: 'Shipping / Delivering (শিপিং-এ আছে)', value: 'shipping' },
+              { label: 'Completed (সরবরাহ সম্পন্ন)', value: 'completed' },
+              { label: 'Cancelled (বাতিল)', value: 'cancelled' }
+            ]} 
+            required
+          />
+          <Input label="Referred Agent ID (Optional)" value={formData.agentId} onChange={(v: string) => setFormData({...formData, agentId: v})} />
+          <ImageUploadInput label="NID Front Photo" value={formData.nidFront} onChange={(v: string) => setFormData({...formData, nidFront: v})} folder="krishi-pona" />
+          <ImageUploadInput label="NID Back Photo" value={formData.nidBack} onChange={(v: string) => setFormData({...formData, nidBack: v})} folder="krishi-pona" />
+          <Textarea label="Delivery Address & Order Specifications" value={formData.details} onChange={(v: string) => setFormData({...formData, details: v})} className="md:col-span-2" />
+        </>
+      )}
+
+      {(type === 'training' || type === 'exports') && (
         <>
           <Input label="User Name" value={formData.userName || formData.name} onChange={(v: string) => setFormData({...formData, userName: v, name: v})} required />
           <Input label="Phone" value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} required />
-          {type === 'pona' && (
-            <Select 
-              label="Category" 
-              value={formData.category} 
-              onChange={(v: string) => setFormData({...formData, category: v})} 
-              options={[
-                { label: 'Fish Pona', value: 'Fish Pona' },
-                { label: 'Poultry Chicks', value: 'Poultry Chicks' },
-                { label: 'Livestock Calves', value: 'Livestock Calves' }
-              ]}
-              required
-            />
-          )}
           {type === 'training' && (
             <>
               <Input label="Training Topic" value={formData.trainingType} onChange={(v: string) => setFormData({...formData, trainingType: v})} required />
