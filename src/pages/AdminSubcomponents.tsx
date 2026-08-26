@@ -534,16 +534,70 @@ export function Form({ type, initialData, onSave, onCancel, speciesList }: any) 
         </>
       )}
 
-      {(type === 'protections' || type === 'pona' || type === 'training' || type === 'exports') && (
+      {type === 'protections' && (
+        <>
+          <Input label="Farmer / Applicant Name" value={formData.name || formData.userName} onChange={(v: string) => setFormData({...formData, name: v, userName: v})} required />
+          <Input label="Father's / Husband's Name" value={formData.fatherName} onChange={(v: string) => setFormData({...formData, fatherName: v})} />
+          <Input label="Phone Number" value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} required />
+          <Input label="NID Number" value={formData.nidNumber} onChange={(v: string) => setFormData({...formData, nidNumber: v})} />
+          <Select 
+            label="Insured Crop / Asset Type" 
+            value={formData.cropType} 
+            onChange={(v: string) => setFormData({...formData, cropType: v})} 
+            options={[
+              { label: 'Rice Cultivation (ধান ফসল)', value: 'Rice' },
+              { label: 'Fisheries (মাছ চাষ)', value: 'Fish' },
+              { label: 'Poultry Farm (হাঁস-মুরগি খামার)', value: 'Poultry' },
+              { label: 'Livestock / Dairy (গবাদিপশু খামার)', value: 'Livestock' },
+              { label: 'Wheat (গম)', value: 'Wheat' },
+              { label: 'Potato (আলু)', value: 'Potato' },
+              { label: 'Jute (পাট)', value: 'Jute' },
+              { label: 'Maize (ভুট্টা)', value: 'Maize' }
+            ]} 
+            required
+          />
+          <Input label="Sub Type / Breed / Variety" value={formData.subType} onChange={(v: string) => setFormData({...formData, subType: v})} />
+          <Input label="Land Area / Animal Quantity" value={formData.landArea || formData.quantity} onChange={(v: string) => setFormData({...formData, landArea: v, quantity: v})} />
+          <Input 
+            label="Total Insured Value (TK)" 
+            value={formData.totalValue} 
+            onChange={(v: string) => {
+              const val = parseFloat(v) || 0;
+              setFormData({...formData, totalValue: v, premium: (val * 0.05).toString()});
+            }} 
+            required 
+          />
+          <Input label="Insurance Premium (TK - 5%)" value={formData.premium} onChange={(v: string) => setFormData({...formData, premium: v})} />
+          <Select 
+            label="District" 
+            value={formData.district} 
+            onChange={(v: string) => setFormData({...formData, district: v})} 
+            options={BANGLADESH_DISTRICTS.map(d => ({ label: d, value: d }))} 
+          />
+          <Input label="Upazila" value={formData.upazila} onChange={(v: string) => setFormData({...formData, upazila: v})} />
+          <Select 
+            label="Protection Status" 
+            value={formData.status} 
+            onChange={(v: string) => setFormData({...formData, status: v})} 
+            options={[
+              { label: 'Pending (অপেক্ষমাণ)', value: 'pending' },
+              { label: 'Approved / Active (অনুমোদিত/সক্রিয়)', value: 'approved' },
+              { label: 'Claimed (ক্লেইমকৃত)', value: 'claimed' },
+              { label: 'Expired (মেয়াদোত্তীর্ণ)', value: 'expired' },
+              { label: 'Rejected (বাতিল)', value: 'rejected' }
+            ]} 
+            required
+          />
+          <ImageUploadInput label="NID Front Photo" value={formData.nidFront} onChange={(v: string) => setFormData({...formData, nidFront: v})} folder="krishi-suraksha" />
+          <ImageUploadInput label="NID Back Photo" value={formData.nidBack} onChange={(v: string) => setFormData({...formData, nidBack: v})} folder="krishi-suraksha" />
+          <Textarea label="Protection Remarks / Notes" value={formData.details || formData.notes} onChange={(v: string) => setFormData({...formData, details: v, notes: v})} className="md:col-span-2" />
+        </>
+      )}
+
+      {(type === 'pona' || type === 'training' || type === 'exports') && (
         <>
           <Input label="User Name" value={formData.userName || formData.name} onChange={(v: string) => setFormData({...formData, userName: v, name: v})} required />
           <Input label="Phone" value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} required />
-          {type === 'protections' && (
-            <>
-              <Input label="Crop Type" value={formData.cropType} onChange={(v: string) => setFormData({...formData, cropType: v})} required />
-              <Input label="Total Value (TK)" value={formData.totalValue} onChange={(v: string) => setFormData({...formData, totalValue: v})} required />
-            </>
-          )}
           {type === 'pona' && (
             <Select 
               label="Category" 

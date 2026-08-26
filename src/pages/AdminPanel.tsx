@@ -96,6 +96,8 @@ export default function AdminPanel() {
   const [selectedLoanDetails, setSelectedLoanDetails] = useState<any>(null);
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
   const [selectedPaymentReceipt, setSelectedPaymentReceipt] = useState<any>(null);
+  const [protectionStatusFilter, setProtectionStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'claimed'>('all');
+  const [selectedProtectionDetails, setSelectedProtectionDetails] = useState<any>(null);
   
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -2227,32 +2229,279 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {activeTab === 'protections' && filterData(protections).map(p => (
-              <div key={p.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Shield size={18} className="text-[#4CAF50]" />
-                    <h4 className="font-bold text-lg">{p.name || p.userName}</h4>
-                    <span className={cn(
-                      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
-                      p.status === 'approved' ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
-                    )}>{p.status}</span>
+            {activeTab === 'protections' && (
+              <div className="p-6 space-y-6">
+                {/* Suraksha Protection KPI Overview Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 rounded-2xl border border-blue-200">
+                    <p className="text-xs font-bold text-blue-700 uppercase tracking-wider">{isBn ? 'মোট বীমা আবেদন' : 'Total Applications'}</p>
+                    <h3 className="text-2xl font-black text-blue-900 mt-1">{protections.length}</h3>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm text-[#556B55]">
-                    <p><strong>Protection ID:</strong> <span className="font-black">{p.protectionId || 'N/A'}</span></p>
-                    <p><strong>Crop:</strong> {p.cropType}</p>
-                    <p><strong>Total Value:</strong> {p.totalValue} TK</p>
-                    <p><strong>Phone:</strong> {p.phone}</p>
-                    <p className="col-span-2 text-xs bg-emerald-50 p-1 rounded"><strong>Referred By:</strong> {p.referredByAgentName ? `${p.referredByAgentName} [${p.referredByAgentId}]` : 'None'}</p>
+                  <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-5 rounded-2xl border border-amber-200">
+                    <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">{isBn ? 'অপেক্ষমাণ অনুমোদন' : 'Pending Approvals'}</p>
+                    <h3 className="text-2xl font-black text-amber-900 mt-1">{protections.filter(p => !p.status || p.status === 'pending').length}</h3>
+                  </div>
+                  <div className="bg-gradient-to-br from-emerald-50 to-green-50 p-5 rounded-2xl border border-emerald-200">
+                    <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider">{isBn ? 'মোট কভারেজ মূল্য' : 'Total Coverage Value'}</p>
+                    <h3 className="text-xl font-black text-emerald-900 mt-1">৳{protections.reduce((acc, p) => acc + (parseFloat(p.totalValue) || 0), 0).toLocaleString()}</h3>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-5 rounded-2xl border border-purple-200">
+                    <p className="text-xs font-bold text-purple-700 uppercase tracking-wider">{isBn ? 'মোট প্রিমিয়াম নির্ধারিত' : 'Total Premium'}</p>
+                    <h3 className="text-xl font-black text-purple-900 mt-1">
+                      ৳{protections.reduce((acc, p) => acc + (parseFloat(p.premium) || ((parseFloat(p.totalValue) || 0) * 0.05)), 0).toLocaleString()}
+                    </h3>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  {isAdmin && <button onClick={() => setEditingItem(p)} className="p-2 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-colors"><Edit2 size={18} /></button>}
-                  {isAdmin && p.status !== 'approved' && <button onClick={() => updateDoc(doc(db, 'protectionApplications', p.id), { status: 'approved', approvalDate: serverTimestamp() })} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-all">Approve</button>}
-                  {isAdmin && <button onClick={() => handleDelete(p.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>}
+
+                {/* Filter Pills */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                      { key: 'all', label: isBn ? 'সকল আবেদন' : 'All Protections', count: protections.length },
+                      { key: 'pending', label: isBn ? 'অপেক্ষমাণ' : 'Pending', count: protections.filter(p => !p.status || p.status === 'pending').length },
+                      { key: 'approved', label: isBn ? 'অনুমোদিত / সক্রিয়' : 'Approved / Active', count: protections.filter(p => p.status === 'approved').length },
+                      { key: 'claimed', label: isBn ? 'ক্লেইমকৃত' : 'Claimed', count: protections.filter(p => p.status === 'claimed').length },
+                      { key: 'rejected', label: isBn ? 'বাতিল' : 'Rejected', count: protections.filter(p => p.status === 'rejected').length },
+                    ].map(f => (
+                      <button
+                        key={f.key}
+                        onClick={() => setProtectionStatusFilter(f.key as any)}
+                        className={cn(
+                          "px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border",
+                          protectionStatusFilter === f.key 
+                            ? "bg-[#4CAF50] text-white border-[#4CAF50] shadow-md shadow-green-900/20"
+                            : "bg-white text-[#556B55] border-[#E0E8E0] hover:bg-[#F0F5F0]"
+                        )}
+                      >
+                        <span>{f.label}</span>
+                        <span className={cn(
+                          "px-1.5 py-0.2 rounded-full text-[10px] font-black",
+                          protectionStatusFilter === f.key ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
+                        )}>{f.count}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                {/* Protections List */}
+                <div className="space-y-4">
+                  {filterData(protections)
+                    .filter(p => {
+                      if (protectionStatusFilter === 'all') return true;
+                      return (p.status || 'pending').toLowerCase() === protectionStatusFilter;
+                    })
+                    .map(p => (
+                      <div key={p.id} className="p-6 bg-white rounded-2xl border border-[#E0E8E0] hover:border-[#4CAF50] transition-all shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                        <div className="space-y-3 flex-1">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-black">
+                              <Shield size={20} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-lg text-[#1B301B]">{p.name || p.userName}</h4>
+                                <span className={cn(
+                                  "px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider",
+                                  p.status === 'approved' ? "bg-green-100 text-green-700 border border-green-200" :
+                                  p.status === 'claimed' ? "bg-purple-100 text-purple-700 border border-purple-200" :
+                                  p.status === 'rejected' ? "bg-red-100 text-red-700 border border-red-200" :
+                                  "bg-amber-100 text-amber-800 border border-amber-200"
+                                )}>
+                                  {p.status || 'pending'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-[#8BA88B] font-mono mt-0.5">
+                                Protection ID: <span className="font-bold text-[#1B301B]">{p.protectionId || p.id}</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 text-xs text-[#556B55] bg-[#F9FBF9] p-3 rounded-xl border border-[#E0E8E0]">
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'বীমা ফসল/খাত:' : 'Insured Crop:'}</span>
+                              <strong className="text-sm text-[#1B301B]">{p.cropType || 'Crop'} {p.subType ? `(${p.subType})` : ''}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'বীমাকৃত মোট মূল্য:' : 'Total Value:'}</span>
+                              <strong className="text-sm text-blue-700">৳{(parseFloat(p.totalValue) || 0).toLocaleString()}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'প্রিমিয়াম (৫%):' : 'Premium:'}</span>
+                              <strong className="text-sm text-emerald-700">৳{(parseFloat(p.premium) || ((parseFloat(p.totalValue) || 0) * 0.05)).toLocaleString()}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'ফোন নম্বর:' : 'Phone:'}</span>
+                              <span className="font-bold text-[#1B301B]">{p.phone}</span>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'এলাকা:' : 'Location:'}</span>
+                              <span>{p.upazila ? `${p.upazila}, ` : ''}{p.district || 'Bangladesh'}</span>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'জমির/খামারের আকার:' : 'Area/Quantity:'}</span>
+                              <span>{p.landArea || p.quantity || 'N/A'}</span>
+                            </div>
+                            <div className="sm:col-span-2">
+                              <span className="text-[#8BA88B] block">{isBn ? 'রেফারেল এজেন্ট:' : 'Referred By:'}</span>
+                              <span className="font-semibold text-emerald-800">{p.referredByAgentName ? `${p.referredByAgentName} (${p.referredByAgentId})` : 'Direct Application'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-wrap lg:flex-col items-end gap-2 shrink-0 border-t lg:border-t-0 pt-3 lg:pt-0">
+                          <button
+                            onClick={() => setSelectedProtectionDetails(p)}
+                            className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all flex items-center gap-1"
+                          >
+                            <Info size={14} />
+                            {isBn ? 'বিস্তারিত' : 'Details'}
+                          </button>
+
+                          {isAdmin && (
+                            <div className="flex items-center gap-2">
+                              {p.status !== 'approved' && p.status !== 'claimed' && (
+                                <button 
+                                  onClick={async () => {
+                                    await updateDoc(doc(db, 'protectionApplications', p.id), { 
+                                      status: 'approved', 
+                                      approvalDate: serverTimestamp() 
+                                    });
+                                    await addDoc(collection(db, 'notifications'), {
+                                      userId: p.userId || '',
+                                      title: 'সুরক্ষা বীমা আবেদন অনুমোদিত',
+                                      message: `আপনার ${p.cropType} ফসলের সুরক্ষা বীমা আবেদন (${p.protectionId || p.id}) সফলভাবে অনুমোদিত হয়েছে।`,
+                                      type: 'protection',
+                                      createdAt: serverTimestamp()
+                                    });
+                                  }} 
+                                  className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all flex items-center gap-1 shadow-sm"
+                                >
+                                  <CheckCircle2 size={14} />
+                                  {isBn ? 'অনুমোদন' : 'Approve'}
+                                </button>
+                              )}
+
+                              {p.status === 'approved' && (
+                                <button 
+                                  onClick={() => updateDoc(doc(db, 'protectionApplications', p.id), { status: 'claimed', claimDate: serverTimestamp() })}
+                                  className="px-3 py-1.5 bg-purple-600 text-white rounded-xl text-xs font-bold hover:bg-purple-700 transition-all"
+                                >
+                                  {isBn ? 'ক্লেইম মার্ক' : 'Mark Claimed'}
+                                </button>
+                              )}
+
+                              {p.status !== 'rejected' && (
+                                <button 
+                                  onClick={async () => {
+                                    if (confirm(isBn ? 'আপনি কি এই সুরক্ষা বীমা আবেদনটি বাতিল করতে চান?' : 'Are you sure you want to reject this protection application?')) {
+                                      await updateDoc(doc(db, 'protectionApplications', p.id), { status: 'rejected' });
+                                    }
+                                  }} 
+                                  className="px-2.5 py-1.5 bg-red-50 text-red-600 rounded-xl text-xs font-bold hover:bg-red-100 transition-all"
+                                >
+                                  {isBn ? 'বাতিল' : 'Reject'}
+                                </button>
+                              )}
+
+                              <button onClick={() => setEditingItem(p)} className="p-1.5 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-colors">
+                                <Edit2 size={16} />
+                              </button>
+                              <button onClick={() => handleDelete(p.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                  {filterData(protections).filter(p => protectionStatusFilter === 'all' || (p.status || 'pending').toLowerCase() === protectionStatusFilter).length === 0 && (
+                    <div className="p-12 text-center text-[#556B55] bg-white rounded-2xl border border-dashed border-[#E0E8E0]">
+                      <Shield size={36} className="mx-auto text-[#8BA88B] mb-2 opacity-50" />
+                      <p className="font-bold">{isBn ? 'এই ক্যাটাগরিতে কোনো সুরক্ষা বীমা আবেদন নেই' : 'No protection applications found in this filter'}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected Protection Details Modal */}
+                {selectedProtectionDetails && (
+                  <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-6 shadow-2xl border border-[#E0E8E0]"
+                    >
+                      <div className="flex items-center justify-between pb-4 border-b border-[#E0E8E0]">
+                        <div>
+                          <h3 className="text-xl font-black text-[#1B301B]">
+                            {isBn ? 'সুরক্ষা বীমা আবেদন বিস্তারিত' : 'Suraksha Application Details'}
+                          </h3>
+                          <p className="text-xs text-[#8BA88B]">Protection ID: <span className="font-mono font-bold text-[#1B301B]">{selectedProtectionDetails.protectionId || selectedProtectionDetails.id}</span></p>
+                        </div>
+                        <button onClick={() => setSelectedProtectionDetails(null)} className="p-2 hover:bg-[#F0F5F0] rounded-full transition-colors">
+                          <X size={20} />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <div className="bg-[#F9FBF9] p-4 rounded-2xl space-y-2 border border-[#E0E8E0]">
+                          <h4 className="font-bold text-[#1B301B] flex items-center gap-1.5"><Users size={16} className="text-[#4CAF50]" /> {isBn ? 'কৃষক / আবেদনকারীর তথ্য' : 'Applicant Info'}</h4>
+                          <p><strong>{isBn ? 'নাম:' : 'Name:'}</strong> {selectedProtectionDetails.name || selectedProtectionDetails.userName}</p>
+                          <p><strong>{isBn ? 'পিতা/স্বামীর নাম:' : 'Father/Husband:'}</strong> {selectedProtectionDetails.fatherName || 'N/A'}</p>
+                          <p><strong>{isBn ? 'ফোন:' : 'Phone:'}</strong> {selectedProtectionDetails.phone}</p>
+                          <p><strong>{isBn ? 'জাতীয় পরিচয়পত্র:' : 'NID:'}</strong> {selectedProtectionDetails.nidNumber || 'N/A'}</p>
+                          <p><strong>{isBn ? 'জেলা ও উপজেলা:' : 'Address:'}</strong> {selectedProtectionDetails.upazila ? `${selectedProtectionDetails.upazila}, ` : ''}{selectedProtectionDetails.district || 'N/A'}</p>
+                        </div>
+
+                        <div className="bg-[#F9FBF9] p-4 rounded-2xl space-y-2 border border-[#E0E8E0]">
+                          <h4 className="font-bold text-[#1B301B] flex items-center gap-1.5"><Shield size={16} className="text-[#4CAF50]" /> {isBn ? 'বীমা ও ফসলের বিবরণ' : 'Insurance & Asset Details'}</h4>
+                          <p><strong>{isBn ? 'ফসল / সম্পদ:' : 'Crop / Sector:'}</strong> {selectedProtectionDetails.cropType} {selectedProtectionDetails.subType ? `(${selectedProtectionDetails.subType})` : ''}</p>
+                          <p><strong>{isBn ? 'জমির/খামারের আকার:' : 'Area/Quantity:'}</strong> {selectedProtectionDetails.landArea || selectedProtectionDetails.quantity || 'N/A'}</p>
+                          <p><strong>{isBn ? 'বীমাকৃত মোট মূল্য:' : 'Total Value:'}</strong> ৳{(parseFloat(selectedProtectionDetails.totalValue) || 0).toLocaleString()}</p>
+                          <p><strong>{isBn ? 'নির্ধারিত প্রিমিয়াম:' : 'Premium (5%):'}</strong> ৳{(parseFloat(selectedProtectionDetails.premium) || ((parseFloat(selectedProtectionDetails.totalValue) || 0) * 0.05)).toLocaleString()}</p>
+                          <p><strong>{isBn ? 'রেফারেল এজেন্ট:' : 'Referred Agent:'}</strong> {selectedProtectionDetails.referredByAgentName ? `${selectedProtectionDetails.referredByAgentName} (${selectedProtectionDetails.referredByAgentId})` : 'Direct'}</p>
+                        </div>
+                      </div>
+
+                      {/* NID Documents Preview */}
+                      {(selectedProtectionDetails.nidFront || selectedProtectionDetails.nidBack) && (
+                        <div className="space-y-2">
+                          <h4 className="font-bold text-sm text-[#1B301B]">{isBn ? 'সংযুক্ত এনআইডি কার্ড ডকুমেন্ট' : 'Attached NID Documents'}</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {selectedProtectionDetails.nidFront && (
+                              <div className="space-y-1">
+                                <span className="text-xs text-[#8BA88B] font-bold">{isBn ? 'সামনের অংশ (Front Side)' : 'Front Side'}</span>
+                                <a href={selectedProtectionDetails.nidFront} target="_blank" rel="noreferrer">
+                                  <img src={selectedProtectionDetails.nidFront} alt="NID Front" className="w-full h-40 object-cover rounded-2xl border border-[#E0E8E0] hover:opacity-90" />
+                                </a>
+                              </div>
+                            )}
+                            {selectedProtectionDetails.nidBack && (
+                              <div className="space-y-1">
+                                <span className="text-xs text-[#8BA88B] font-bold">{isBn ? 'পেছনের অংশ (Back Side)' : 'Back Side'}</span>
+                                <a href={selectedProtectionDetails.nidBack} target="_blank" rel="noreferrer">
+                                  <img src={selectedProtectionDetails.nidBack} alt="NID Back" className="w-full h-40 object-cover rounded-2xl border border-[#E0E8E0] hover:opacity-90" />
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-end gap-3 pt-4 border-t border-[#E0E8E0]">
+                        <button
+                          onClick={() => setSelectedProtectionDetails(null)}
+                          className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-bold text-sm transition-all"
+                        >
+                          {isBn ? 'বন্ধ করুন' : 'Close'}
+                        </button>
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
               </div>
-            ))}
+            )}
 
             {activeTab === 'protection-updates' && filterData(protectionUpdates).map(upd => (
               <div key={upd.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center gap-6">
