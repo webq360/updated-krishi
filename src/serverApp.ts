@@ -1,4 +1,4 @@
-import express, { Router, Request, Response, NextFunction } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import { GoogleGenAI } from "@google/genai";
 import { v2 as cloudinary } from "cloudinary";
 import dotenv from "dotenv";
@@ -23,13 +23,20 @@ if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && proce
 }
 
 export const app = express();
-const router = Router();
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Middleware to ensure DB connection
-router.use(async (req: Request, res: Response, next: NextFunction) => {
+// URL Normalization Middleware: ensures all routes start with /api
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (!req.url.startsWith('/api')) {
+    req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
+  }
+  next();
+});
+
+// Middleware to ensure DB connection on all API requests
+app.use(async (req: Request, res: Response, next: NextFunction) => {
   try {
     await connectMongoDB();
   } catch (err) {
@@ -48,7 +55,7 @@ function getGenAI() {
 }
 
 // ==================== Health Check ====================
-router.get("/health", (req: Request, res: Response) => {
+app.get("/api/health", (req: Request, res: Response) => {
   const isDbConnected = mongoose.connection.readyState === 1;
   const health = {
     status: "ok",
@@ -69,7 +76,7 @@ router.get("/health", (req: Request, res: Response) => {
 // ==================== Auth Routes ====================
 
 // Register
-router.post("/auth/register", async (req: Request, res: Response) => {
+app.post("/api/auth/register", async (req: Request, res: Response) => {
   try {
     if (mongoose.connection.readyState !== 1) {
       await connectMongoDB();
@@ -140,7 +147,7 @@ router.post("/auth/register", async (req: Request, res: Response) => {
 });
 
 // Login
-router.post("/auth/login", async (req: Request, res: Response) => {
+app.post("/api/auth/login", async (req: Request, res: Response) => {
   try {
     if (mongoose.connection.readyState !== 1) {
       await connectMongoDB();
@@ -202,12 +209,12 @@ router.post("/auth/login", async (req: Request, res: Response) => {
 });
 
 // Verify Token
-router.post("/auth/verify", authMiddleware, (req: Request, res: Response) => {
+app.post("/api/auth/verify", authMiddleware, (req: Request, res: Response) => {
   return res.json({ valid: true, user: (req as any).user });
 });
 
 // Get Current User
-router.get("/auth/me", authMiddleware, async (req: Request, res: Response) => {
+app.get("/api/auth/me", authMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     const user = await User.findById(userId);
@@ -231,7 +238,7 @@ router.get("/auth/me", authMiddleware, async (req: Request, res: Response) => {
 // ==================== Admin Routes ====================
 
 // Create Admin User
-router.post("/admin/create-admin", adminMiddleware, async (req: Request, res: Response) => {
+app.post("/api/admin/create-admin", adminMiddleware, async (req: Request, res: Response) => {
   try {
     const { email, password, firstName, lastName } = req.body;
 
@@ -269,7 +276,7 @@ router.post("/admin/create-admin", adminMiddleware, async (req: Request, res: Re
 });
 
 // Get All Users
-router.get("/admin/users", authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+app.get("/api/admin/users", authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
   try {
     const users = await User.find().select('-password');
     return res.json(users);
@@ -279,7 +286,7 @@ router.get("/admin/users", authMiddleware, adminMiddleware, async (req: Request,
 });
 
 // Update User Role
-router.patch("/admin/users/:id/role", authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+app.patch("/api/admin/users/:id/role", authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
   try {
     const { role } = req.body;
     
@@ -304,7 +311,7 @@ router.patch("/admin/users/:id/role", authMiddleware, adminMiddleware, async (re
 });
 
 // Delete User
-router.delete("/admin/users/:id", authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
+app.delete("/api/admin/users/:id", authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
     
@@ -321,15 +328,15 @@ router.delete("/admin/users/:id", authMiddleware, adminMiddleware, async (req: R
 // ==================== Dynamic MongoDB Collection API ====================
 
 // Get All Documents from Collection
-router.get("/data/:collection", async (req: Request, res: Response) => {
+app.get("/api/data/:collection", async (req: Request, res: Response) => {
   try {
-    const { collection } = req.params;
+    const collection = String(req.params.collection);
 
     if (mongoose.connection.readyState !== 1) {
       await connectMongoDB();
     }
 
-    // Graceful fallback if database is not reachable yet
+    // Return empty array if database is not reachable instead of throwing 500/404
     if (mongoose.connection.readyState !== 1) {
       return res.json([]);
     }
@@ -383,7 +390,7 @@ router.get("/data/:collection", async (req: Request, res: Response) => {
 });
 
 // Get Single Document by ID
-router.get("/data/:collection/:id", async (req: Request, res: Response) => {
+app.get("/api/data/:collection/:id", async (req: Request, res: Response) => {
   try {
     const collection = String(req.params.collection);
     const id = String(req.params.id);
@@ -424,9 +431,9 @@ router.get("/data/:collection/:id", async (req: Request, res: Response) => {
 });
 
 // Create Document in Collection
-router.post("/data/:collection", async (req: Request, res: Response) => {
+app.post("/api/data/:collection", async (req: Request, res: Response) => {
   try {
-    const { collection } = req.params;
+    const collection = String(req.params.collection);
     const bodyData = { ...req.body };
 
     if (mongoose.connection.readyState !== 1) {
@@ -458,7 +465,7 @@ router.post("/data/:collection", async (req: Request, res: Response) => {
 });
 
 // Update Document in Collection
-router.patch("/data/:collection/:id", async (req: Request, res: Response) => {
+app.patch("/api/data/:collection/:id", async (req: Request, res: Response) => {
   try {
     const collection = String(req.params.collection);
     const id = String(req.params.id);
@@ -534,7 +541,7 @@ router.patch("/data/:collection/:id", async (req: Request, res: Response) => {
 });
 
 // Replace / Set Document
-router.put("/data/:collection/:id", async (req: Request, res: Response) => {
+app.put("/api/data/:collection/:id", async (req: Request, res: Response) => {
   try {
     const collection = String(req.params.collection);
     const id = String(req.params.id);
@@ -589,7 +596,7 @@ router.put("/data/:collection/:id", async (req: Request, res: Response) => {
 });
 
 // Delete Document from Collection
-router.delete("/data/:collection/:id", async (req: Request, res: Response) => {
+app.delete("/api/data/:collection/:id", async (req: Request, res: Response) => {
   try {
     const collection = String(req.params.collection);
     const id = String(req.params.id);
@@ -623,7 +630,7 @@ router.delete("/data/:collection/:id", async (req: Request, res: Response) => {
 });
 
 // Upload API for Cloudinary
-router.post("/upload", async (req: Request, res: Response) => {
+app.post("/api/upload", async (req: Request, res: Response) => {
   try {
     const { image, folder = "krishi-bondhu" } = req.body;
     if (!image) {
@@ -660,7 +667,7 @@ router.post("/upload", async (req: Request, res: Response) => {
 });
 
 // AI Analyze (Vision)
-router.post("/ai/analyze", async (req: Request, res: Response) => {
+app.post("/api/ai/analyze", async (req: Request, res: Response) => {
   try {
     const { image, mimeType, prompt } = req.body;
     if (!image || !mimeType) {
@@ -723,7 +730,7 @@ router.post("/ai/analyze", async (req: Request, res: Response) => {
 });
 
 // AI Chat
-router.post("/ai/chat", async (req: Request, res: Response) => {
+app.post("/api/ai/chat", async (req: Request, res: Response) => {
   try {
     const { prompt, history, systemInstruction, image, mimeType } = req.body;
     
@@ -802,9 +809,10 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
   }
 });
 
-// Mount Router on both '/api' and '/'
-app.use('/api', router);
-app.use('/', router);
+// Fallback for unhandled API endpoints
+app.all("/api/*", (req: Request, res: Response) => {
+  return res.status(404).json({ error: "API route not found: " + req.method + " " + req.url });
+});
 
 // Global error handler
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
