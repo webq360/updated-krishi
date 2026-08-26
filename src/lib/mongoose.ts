@@ -8,9 +8,27 @@ export async function connectMongoDB() {
     return cachedConnection;
   }
 
+  const mongoUrl = process.env.MONGODB_URI;
+  if (!mongoUrl || mongoUrl.includes('your-mongodb') || (!mongoUrl.startsWith('mongodb://') && !mongoUrl.startsWith('mongodb+srv://'))) {
+    if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+      // Local development default
+      try {
+        cachedConnection = await mongoose.connect('mongodb://localhost:27017/krishi-bondhu', {
+          serverSelectionTimeoutMS: 2000,
+        });
+        return cachedConnection;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
   if (isConnecting) {
-    while (isConnecting) {
-      await new Promise(resolve => setTimeout(resolve, 50));
+    let attempts = 0;
+    while (isConnecting && attempts < 20) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      attempts++;
     }
     if (cachedConnection && mongoose.connection.readyState === 1) {
       return cachedConnection;
@@ -19,18 +37,16 @@ export async function connectMongoDB() {
 
   isConnecting = true;
   try {
-    const mongoUrl = process.env.MONGODB_URI || 'mongodb://localhost:27017/krishi-bondhu';
     cachedConnection = await mongoose.connect(mongoUrl, {
-      serverSelectionTimeoutMS: 8000,
-      bufferCommands: false,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
     });
     console.log('✅ MongoDB connected successfully');
     return cachedConnection;
   } catch (error) {
-    console.error('❌ MongoDB connection failed:', error);
+    console.error('❌ MongoDB connection error:', error);
     return null;
   } finally {
     isConnecting = false;
   }
 }
-

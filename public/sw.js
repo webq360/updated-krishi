@@ -1,9 +1,9 @@
 // Krishi Bondhu Service Worker
-const CACHE_NAME = 'krishi-bondhu-v1';
+const CACHE_NAME = 'krishi-bondhu-v2';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/logo.png',
+  '/krishi_logo.png',
   '/manifest.json'
 ];
 
@@ -14,7 +14,9 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('[Service Worker] Caching app shell');
-        return cache.addAll(urlsToCache);
+        return cache.addAll(urlsToCache).catch(err => {
+          console.warn('[Service Worker] Pre-cache non-fatal error:', err);
+        });
       })
       .then(() => self.skipWaiting())
   );
@@ -37,68 +39,56 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch Event - Network first, fallback to cache
+// Fetch Event - Network first, graceful fallback
 self.addEventListener('fetch', (event) => {
-  // Skip cross-origin requests
-  if (!event.request.url.startsWith(self.location.origin)) {
+  const url = event.request.url;
+
+  // Never intercept API requests or chrome-extension schemes
+  if (url.includes('/api/') || !url.startsWith(self.location.origin)) {
     return;
   }
 
-  // Skip API requests from caching
-  if (event.request.url.includes('/api/')) {
+  // Handle navigation requests (e.g. /login, /register, /farmer-market)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .catch(() => {
+          return caches.match('/index.html').then((response) => {
+            return response || new Response('Offline', { status: 503, statusText: 'Offline' });
+          });
+        })
+    );
     return;
   }
 
+  // Handle static assets
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Clone the response
-        const responseToCache = response.clone();
-        
-        // Cache the fetched resource
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-        
+        if (response && response.status === 200 && response.type === 'basic') {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+        }
         return response;
       })
-      .catch(() => {
-        // Network failed, try cache
-        return caches.match(event.request).then((cachedResponse) => {
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-          
-          // Return offline page if available
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
-          }
-        });
+      .catch(async () => {
+        const cached = await caches.match(event.request);
+        if (cached) return cached;
+        return new Response('', { status: 404, statusText: 'Not Found' });
       })
   );
 });
 
-// Background Sync (for future use)
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-data') {
-    console.log('[Service Worker] Background sync triggered');
-    event.waitUntil(syncData());
-  }
-});
-
-async function syncData() {
-  // Implement data syncing logic here
-  console.log('[Service Worker] Syncing data...');
-}
-
-// Push Notifications (for future use)
+// Push Notifications
 self.addEventListener('push', (event) => {
   const data = event.data ? event.data.json() : {};
   const title = data.title || 'Krishi Bondhu';
   const options = {
     body: data.body || 'নতুন আপডেট',
-    icon: '/logo.png',
-    badge: '/logo.png',
+    icon: '/krishi_logo.png',
+    badge: '/krishi_logo.png',
     vibrate: [200, 100, 200],
     tag: 'krishi-notification',
     renotify: true

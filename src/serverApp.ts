@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Router, Request, Response, NextFunction } from "express";
 import { GoogleGenAI } from "@google/genai";
 import { v2 as cloudinary } from "cloudinary";
 import dotenv from "dotenv";
@@ -23,17 +23,17 @@ if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && proce
 }
 
 export const app = express();
+const router = Router();
 
 app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Middleware to ensure DB connection
-app.use(async (req, res, next) => {
-  if (req.url.startsWith('/api')) {
-    try {
-      await connectMongoDB();
-    } catch (err) {
-      console.error("MongoDB connection middleware error:", err);
-    }
+router.use(async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await connectMongoDB();
+  } catch (err) {
+    console.warn("MongoDB connection warning:", err);
   }
   next();
 });
@@ -47,11 +47,40 @@ function getGenAI() {
   return new GoogleGenAI({ apiKey });
 }
 
+// ==================== Health Check ====================
+router.get("/health", (req: Request, res: Response) => {
+  const isDbConnected = mongoose.connection.readyState === 1;
+  const health = {
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    mode: process.env.NODE_ENV || 'production',
+    isVercel: !!process.env.VERCEL,
+    mongodb: isDbConnected ? 'connected' : 'disconnected',
+    environment: {
+      hasMongodbUri: !!process.env.MONGODB_URI && !process.env.MONGODB_URI.includes('your-mongodb'),
+      hasJwtSecret: !!process.env.JWT_SECRET && !process.env.JWT_SECRET.includes('your-secret'),
+      hasGeminiKey: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.length > 10,
+      hasCloudinary: !!((process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) || process.env.CLOUDINARY_URL),
+    }
+  };
+  return res.status(200).json(health);
+});
+
 // ==================== Auth Routes ====================
 
 // Register
-app.post("/api/auth/register", async (req, res) => {
+router.post("/auth/register", async (req: Request, res: Response) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      await connectMongoDB();
+    }
+
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ 
+        error: "Database is connecting or not configured. Please ensure MONGODB_URI is set in your Vercel Environment Variables." 
+      });
+    }
+
     const { email, password, name, firstName, lastName, phone, address, upazila } = req.body;
 
     const userEmail = (email && email.trim()) 
@@ -89,7 +118,7 @@ app.post("/api/auth/register", async (req, res) => {
 
     const token = generateToken(user._id.toString(), user.email, user.role);
 
-    res.status(201).json({
+    return res.status(201).json({
       message: "User registered successfully",
       token,
       user: {
@@ -106,13 +135,23 @@ app.post("/api/auth/register", async (req, res) => {
     });
   } catch (error) {
     console.error("Register Error:", error);
-    res.status(500).json({ error: error instanceof Error ? error.message : "Internal Server Error" });
+    return res.status(500).json({ error: error instanceof Error ? error.message : "Internal Server Error" });
   }
 });
 
 // Login
-app.post("/api/auth/login", async (req, res) => {
+router.post("/auth/login", async (req: Request, res: Response) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      await connectMongoDB();
+    }
+
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ 
+        error: "Database is connecting or not configured. Please ensure MONGODB_URI is set in your Vercel Environment Variables." 
+      });
+    }
+
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -141,7 +180,7 @@ app.post("/api/auth/login", async (req, res) => {
 
     const token = generateToken(user._id.toString(), user.email, user.role);
 
-    res.json({
+    return res.json({
       message: "Login successful",
       token,
       user: {
@@ -158,17 +197,17 @@ app.post("/api/auth/login", async (req, res) => {
     });
   } catch (error) {
     console.error("Login Error:", error);
-    res.status(500).json({ error: error instanceof Error ? error.message : "Internal Server Error" });
+    return res.status(500).json({ error: error instanceof Error ? error.message : "Internal Server Error" });
   }
 });
 
 // Verify Token
-app.post("/api/auth/verify", authMiddleware, (req, res) => {
-  res.json({ valid: true, user: (req as any).user });
+router.post("/auth/verify", authMiddleware, (req: Request, res: Response) => {
+  return res.json({ valid: true, user: (req as any).user });
 });
 
 // Get Current User
-app.get("/api/auth/me", authMiddleware, async (req, res) => {
+router.get("/auth/me", authMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     const user = await User.findById(userId);
@@ -177,7 +216,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    res.json({
+    return res.json({
       id: user._id,
       email: user.email,
       firstName: user.firstName,
@@ -185,14 +224,14 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
       role: user.role
     });
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch user" });
+    return res.status(500).json({ error: "Failed to fetch user" });
   }
 });
 
 // ==================== Admin Routes ====================
 
 // Create Admin User
-app.post("/api/admin/create-admin", adminMiddleware, async (req, res) => {
+router.post("/admin/create-admin", adminMiddleware, async (req: Request, res: Response) => {
   try {
     const { email, password, firstName, lastName } = req.body;
 
@@ -215,7 +254,7 @@ app.post("/api/admin/create-admin", adminMiddleware, async (req, res) => {
 
     await user.save();
 
-    res.status(201).json({
+    return res.status(201).json({
       message: "Admin user created successfully",
       user: {
         id: user._id,
@@ -225,22 +264,22 @@ app.post("/api/admin/create-admin", adminMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error("Create Admin Error:", error);
-    res.status(500).json({ error: error instanceof Error ? error.message : "Internal Server Error" });
+    return res.status(500).json({ error: error instanceof Error ? error.message : "Internal Server Error" });
   }
 });
 
 // Get All Users
-app.get("/api/admin/users", authMiddleware, adminMiddleware, async (req, res) => {
+router.get("/admin/users", authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
   try {
     const users = await User.find().select('-password');
-    res.json(users);
+    return res.json(users);
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch users" });
+    return res.status(500).json({ error: "Failed to fetch users" });
   }
 });
 
 // Update User Role
-app.patch("/api/admin/users/:id/role", authMiddleware, adminMiddleware, async (req, res) => {
+router.patch("/admin/users/:id/role", authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
   try {
     const { role } = req.body;
     
@@ -258,14 +297,14 @@ app.patch("/api/admin/users/:id/role", authMiddleware, adminMiddleware, async (r
       return res.status(404).json({ error: "User not found" });
     }
 
-    res.json({ message: "User role updated", user });
+    return res.json({ message: "User role updated", user });
   } catch (error) {
-    res.status(500).json({ error: "Failed to update user" });
+    return res.status(500).json({ error: "Failed to update user" });
   }
 });
 
 // Delete User
-app.delete("/api/admin/users/:id", authMiddleware, adminMiddleware, async (req, res) => {
+router.delete("/admin/users/:id", authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
     
@@ -273,18 +312,28 @@ app.delete("/api/admin/users/:id", authMiddleware, adminMiddleware, async (req, 
       return res.status(404).json({ error: "User not found" });
     }
 
-    res.json({ message: "User deleted successfully" });
+    return res.json({ message: "User deleted successfully" });
   } catch (error) {
-    res.status(500).json({ error: "Failed to delete user" });
+    return res.status(500).json({ error: "Failed to delete user" });
   }
 });
 
 // ==================== Dynamic MongoDB Collection API ====================
 
 // Get All Documents from Collection
-app.get("/api/data/:collection", async (req, res) => {
+router.get("/data/:collection", async (req: Request, res: Response) => {
   try {
     const { collection } = req.params;
+
+    if (mongoose.connection.readyState !== 1) {
+      await connectMongoDB();
+    }
+
+    // Graceful fallback if database is not reachable yet
+    if (mongoose.connection.readyState !== 1) {
+      return res.json([]);
+    }
+
     const queryFilter: Record<string, any> = { collectionName: collection };
 
     Object.keys(req.query).forEach((key) => {
@@ -318,7 +367,7 @@ app.get("/api/data/:collection", async (req, res) => {
 
     const docs = await mongoQuery.lean();
 
-    const formatted = docs.map((doc: any) => ({
+    const formatted = (docs || []).map((doc: any) => ({
       id: doc._id.toString(),
       _id: doc._id.toString(),
       createdAt: doc.createdAt,
@@ -326,17 +375,27 @@ app.get("/api/data/:collection", async (req, res) => {
       ...(doc.data || {}),
     }));
 
-    res.json(formatted);
+    return res.json(formatted);
   } catch (error) {
     console.error(`Fetch Data Error [${req.params.collection}]:`, error);
-    res.status(500).json({ error: "Failed to fetch collection documents" });
+    return res.json([]);
   }
 });
 
 // Get Single Document by ID
-app.get("/api/data/:collection/:id", async (req, res) => {
+router.get("/data/:collection/:id", async (req: Request, res: Response) => {
   try {
-    const { collection, id } = req.params;
+    const collection = String(req.params.collection);
+    const id = String(req.params.id);
+
+    if (mongoose.connection.readyState !== 1) {
+      await connectMongoDB();
+    }
+
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+
     let doc: any = null;
 
     if (mongoose.Types.ObjectId.isValid(id)) {
@@ -351,7 +410,7 @@ app.get("/api/data/:collection/:id", async (req, res) => {
       return res.status(404).json({ error: "Document not found" });
     }
 
-    res.json({
+    return res.json({
       id: doc._id.toString(),
       _id: doc._id.toString(),
       createdAt: doc.createdAt,
@@ -360,15 +419,23 @@ app.get("/api/data/:collection/:id", async (req, res) => {
     });
   } catch (error) {
     console.error(`Fetch Doc Error:`, error);
-    res.status(500).json({ error: "Failed to fetch document" });
+    return res.status(500).json({ error: "Failed to fetch document" });
   }
 });
 
 // Create Document in Collection
-app.post("/api/data/:collection", async (req, res) => {
+router.post("/data/:collection", async (req: Request, res: Response) => {
   try {
     const { collection } = req.params;
     const bodyData = { ...req.body };
+
+    if (mongoose.connection.readyState !== 1) {
+      await connectMongoDB();
+    }
+
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: "Database not connected" });
+    }
 
     const newDoc = new DataDocument({
       collectionName: collection,
@@ -377,7 +444,7 @@ app.post("/api/data/:collection", async (req, res) => {
 
     await newDoc.save();
 
-    res.status(201).json({
+    return res.status(201).json({
       id: newDoc._id.toString(),
       _id: newDoc._id.toString(),
       createdAt: newDoc.createdAt,
@@ -386,15 +453,24 @@ app.post("/api/data/:collection", async (req, res) => {
     });
   } catch (error) {
     console.error(`Create Data Error [${req.params.collection}]:`, error);
-    res.status(500).json({ error: "Failed to create document" });
+    return res.status(500).json({ error: "Failed to create document" });
   }
 });
 
 // Update Document in Collection
-app.patch("/api/data/:collection/:id", async (req, res) => {
+router.patch("/data/:collection/:id", async (req: Request, res: Response) => {
   try {
-    const { collection, id } = req.params;
+    const collection = String(req.params.collection);
+    const id = String(req.params.id);
     const updateData = { ...req.body };
+
+    if (mongoose.connection.readyState !== 1) {
+      await connectMongoDB();
+    }
+
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: "Database not connected" });
+    }
 
     let doc = null;
     if (mongoose.Types.ObjectId.isValid(id)) {
@@ -444,7 +520,7 @@ app.patch("/api/data/:collection/:id", async (req, res) => {
     doc.markModified('data');
     await doc.save();
 
-    res.json({
+    return res.json({
       id: doc._id.toString(),
       _id: doc._id.toString(),
       createdAt: doc.createdAt,
@@ -453,15 +529,24 @@ app.patch("/api/data/:collection/:id", async (req, res) => {
     });
   } catch (error) {
     console.error(`Update Data Error:`, error);
-    res.status(500).json({ error: "Failed to update document" });
+    return res.status(500).json({ error: "Failed to update document" });
   }
 });
 
 // Replace / Set Document
-app.put("/api/data/:collection/:id", async (req, res) => {
+router.put("/data/:collection/:id", async (req: Request, res: Response) => {
   try {
-    const { collection, id } = req.params;
+    const collection = String(req.params.collection);
+    const id = String(req.params.id);
     const replaceData = { ...req.body };
+
+    if (mongoose.connection.readyState !== 1) {
+      await connectMongoDB();
+    }
+
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: "Database not connected" });
+    }
 
     let doc = null;
     if (mongoose.Types.ObjectId.isValid(id)) {
@@ -490,7 +575,7 @@ app.put("/api/data/:collection/:id", async (req, res) => {
     doc.markModified('data');
     await doc.save();
 
-    res.json({
+    return res.json({
       id: doc._id.toString(),
       _id: doc._id.toString(),
       createdAt: doc.createdAt,
@@ -499,14 +584,24 @@ app.put("/api/data/:collection/:id", async (req, res) => {
     });
   } catch (error) {
     console.error(`Set Data Error:`, error);
-    res.status(500).json({ error: "Failed to set document" });
+    return res.status(500).json({ error: "Failed to set document" });
   }
 });
 
 // Delete Document from Collection
-app.delete("/api/data/:collection/:id", async (req, res) => {
+router.delete("/data/:collection/:id", async (req: Request, res: Response) => {
   try {
-    const { collection, id } = req.params;
+    const collection = String(req.params.collection);
+    const id = String(req.params.id);
+
+    if (mongoose.connection.readyState !== 1) {
+      await connectMongoDB();
+    }
+
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: "Database not connected" });
+    }
+
     let deleted = null;
 
     if (mongoose.Types.ObjectId.isValid(id)) {
@@ -520,15 +615,15 @@ app.delete("/api/data/:collection/:id", async (req, res) => {
       return res.status(404).json({ error: "Document not found" });
     }
 
-    res.json({ message: "Document deleted successfully" });
+    return res.json({ message: "Document deleted successfully" });
   } catch (error) {
     console.error(`Delete Data Error:`, error);
-    res.status(500).json({ error: "Failed to delete document" });
+    return res.status(500).json({ error: "Failed to delete document" });
   }
 });
 
 // Upload API for Cloudinary
-app.post("/api/upload", async (req, res) => {
+router.post("/upload", async (req: Request, res: Response) => {
   try {
     const { image, folder = "krishi-bondhu" } = req.body;
     if (!image) {
@@ -550,7 +645,7 @@ app.post("/api/upload", async (req, res) => {
           provider: "cloudinary"
         });
       } catch (cloudErr: any) {
-        console.warn("Cloudinary upload failed, falling back to optimized inline data:", cloudErr?.message || cloudErr);
+        console.warn("Cloudinary upload fallback:", cloudErr?.message || cloudErr);
       }
     }
 
@@ -560,29 +655,12 @@ app.post("/api/upload", async (req, res) => {
     });
   } catch (error: any) {
     console.error("Upload API Error:", error);
-    res.status(500).json({ error: error.message || "Failed to process image upload" });
+    return res.status(500).json({ error: error.message || "Failed to process image upload" });
   }
 });
 
-// Health check
-app.get("/api/health", (req, res) => {
-  const health = {
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    mode: process.env.NODE_ENV || 'development',
-    uptime: process.uptime(),
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    environment: {
-      hasMongodbUri: !!process.env.MONGODB_URI && process.env.MONGODB_URI !== 'your_mongodb_uri',
-      hasJwtSecret: !!process.env.JWT_SECRET && process.env.JWT_SECRET !== 'your_jwt_secret',
-      hasGeminiKey: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key',
-    }
-  };
-  res.json(health);
-});
-
 // AI Analyze (Vision)
-app.post("/api/ai/analyze", async (req, res) => {
+router.post("/ai/analyze", async (req: Request, res: Response) => {
   try {
     const { image, mimeType, prompt } = req.body;
     if (!image || !mimeType) {
@@ -618,7 +696,7 @@ app.post("/api/ai/analyze", async (req, res) => {
         }
       }
     } catch (aiError: any) {
-      console.warn(`[AI Advisory] Gemini API key note: ${aiError?.message || 'Check .env'}. Using expert domain fallback response.`);
+      console.warn(`[AI Advisory] Gemini API key note: ${aiError?.message || 'Check .env'}. Using expert fallback.`);
     }
 
     const isFish = (prompt || '').includes('মাছ') || (prompt || '').includes('fish') || (prompt || '').includes('FISH');
@@ -640,12 +718,12 @@ app.post("/api/ai/analyze", async (req, res) => {
     });
   } catch (error) {
     console.error("AI Analysis Error:", error);
-    res.status(500).json({ error: error instanceof Error ? error.message : "Internal Server Error" });
+    return res.status(500).json({ error: error instanceof Error ? error.message : "Internal Server Error" });
   }
 });
 
 // AI Chat
-app.post("/api/ai/chat", async (req, res) => {
+router.post("/ai/chat", async (req: Request, res: Response) => {
   try {
     const { prompt, history, systemInstruction, image, mimeType } = req.body;
     
@@ -689,7 +767,7 @@ app.post("/api/ai/chat", async (req, res) => {
         }
       }
     } catch (aiErr: any) {
-      console.warn(`[AI Advisory] Gemini API key note: ${aiErr?.message || 'Check .env'}. Using expert domain fallback response.`);
+      console.warn(`[AI Advisory] Gemini API key note: ${aiErr?.message || 'Check .env'}. Using expert fallback.`);
     }
 
     const q = (prompt || '').toLowerCase();
@@ -717,10 +795,21 @@ app.post("/api/ai/chat", async (req, res) => {
       reply = "📞 **কৃষি বন্ধু ও ABS Feed হটলাইন:**\n- সরাসরি আঞ্চলিক অফিস ও বিশেষজ্ঞের সাথে কথা বলতে কল করুন: **09638-201586** (সকাল ৯টা - সন্ধ্যা ৬টা)।";
     }
 
-    res.json({ text: reply });
+    return res.json({ text: reply });
   } catch (error) {
     console.error("AI Chat Error:", error);
-    res.status(500).json({ error: error instanceof Error ? error.message : "Internal Server Error" });
+    return res.status(500).json({ error: error instanceof Error ? error.message : "Internal Server Error" });
   }
 });
 
+// Mount Router on both '/api' and '/'
+app.use('/api', router);
+app.use('/', router);
+
+// Global error handler
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  console.error("SERVER ERROR:", err);
+  if (!res.headersSent) {
+    res.status(500).json({ error: "Internal Server Error", message: err?.message || String(err) });
+  }
+});
