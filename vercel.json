@@ -1,39 +1,15 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
-  "env": {
-    "MONGODB_URI": "@mongodb_uri",
-    "JWT_SECRET": "@jwt_secret",
-    "GEMINI_API_KEY": "@gemini_api_key",
-    "NODE_ENV": "production"
-  },
-  "installCommand": "npm install",
   "outputDirectory": "dist",
-  "framework": "vite",
-  "functions": {
-    "server.ts": {
-      "maxDuration": 30,
-      "memory": 1024
-    }
-  },
-  "routes": [
+  "rewrites": [
     {
-      "src": "^/api/(.*)",
-      "dest": "server.ts",
-      "methods": ["GET", "POST", "PATCH", "DELETE", "PUT", "OPTIONS"]
+      "source": "/api/(.*)",
+      "destination": "/api/index.ts"
     },
     {
-      "src": "/(.*)",
-      "dest": "server.ts",
-      "methods": ["GET"]
-    }
-  ],
-  "redirects": [
-    {
-      "source": "/api",
-      "destination": "/api/health",
-      "permanent": false
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
-
