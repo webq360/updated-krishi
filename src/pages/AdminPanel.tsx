@@ -94,6 +94,8 @@ export default function AdminPanel() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loanStatusFilter, setLoanStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'disbursed'>('all');
   const [selectedLoanDetails, setSelectedLoanDetails] = useState<any>(null);
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
+  const [selectedPaymentReceipt, setSelectedPaymentReceipt] = useState<any>(null);
   
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -1973,26 +1975,257 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {activeTab === 'loan-payments' && filterData(loanPayments).map(pay => (
-              <div key={pay.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4 border-l-4 border-l-[#4CAF50]">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <HistoryIcon size={18} className="text-[#4CAF50]" />
-                    <h4 className="font-bold text-lg">Installment Paid</h4>
-                    <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase">{pay.item || 'Loan Payment'}</span>
+            {activeTab === 'loan-payments' && (
+              <div className="p-6 space-y-6">
+                {/* Installment KPI Overview Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-5 rounded-2xl border border-emerald-200">
+                    <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider">{isBn ? 'মোট আদায়কৃত অর্থ' : 'Total Collection'}</p>
+                    <h3 className="text-2xl font-black text-emerald-900 mt-1">
+                      ৳{loanPayments.reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0).toLocaleString()}
+                    </h3>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm text-[#556B55]">
-                    <p><strong>Loan ID:</strong> {pay.loanId}</p>
-                    <p><strong>Amount:</strong> {pay.amount} TK</p>
-                    <p><strong>Date:</strong> {pay.date}</p>
-                    <p><strong>Method:</strong> {pay.method}</p>
+                  <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-5 rounded-2xl border border-blue-200">
+                    <p className="text-xs font-bold text-blue-700 uppercase tracking-wider">{isBn ? 'মোট কিস্তি জমা সংখ্যা' : 'Total Slips'}</p>
+                    <h3 className="text-2xl font-black text-blue-900 mt-1">{loanPayments.length}</h3>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-5 rounded-2xl border border-purple-200">
+                    <p className="text-xs font-bold text-purple-700 uppercase tracking-wider">{isBn ? 'গড় কিস্তির পরিমাণ' : 'Average Installment'}</p>
+                    <h3 className="text-xl font-black text-purple-900 mt-1">
+                      ৳{loanPayments.length > 0 ? Math.round(loanPayments.reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0) / loanPayments.length).toLocaleString() : '0'}
+                    </h3>
+                  </div>
+                  <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-5 rounded-2xl border border-amber-200">
+                    <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">{isBn ? 'সর্বোচ্চ একক জমা' : 'Highest Installment'}</p>
+                    <h3 className="text-xl font-black text-amber-900 mt-1">
+                      ৳{Math.max(0, ...loanPayments.map(p => parseFloat(p.amount) || 0)).toLocaleString()}
+                    </h3>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  {isAdmin && <button onClick={() => handleDelete(pay.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>}
+
+                {/* Filter Pills & Add Button */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                      { key: 'all', label: isBn ? 'সকল কিস্তি' : 'All Payments', count: loanPayments.length },
+                      { key: 'Mobile Banking', label: isBn ? 'মোবাইল ব্যাংকিং' : 'Mobile Banking', count: loanPayments.filter(p => (p.method || '').includes('Mobile')).length },
+                      { key: 'Bank Transfer', label: isBn ? 'ব্যাংক ট্রান্সফার' : 'Bank Transfer', count: loanPayments.filter(p => (p.method || '').includes('Bank')).length },
+                      { key: 'Agent Counter', label: isBn ? 'এজেন্ট কাউন্টার' : 'Agent Counter', count: loanPayments.filter(p => (p.method || '').includes('Agent')).length },
+                      { key: 'Cash Payment', label: isBn ? 'নগদ গ্রহণ' : 'Cash', count: loanPayments.filter(p => (p.method || '').includes('Cash')).length },
+                    ].map(f => (
+                      <button
+                        key={f.key}
+                        onClick={() => setPaymentMethodFilter(f.key)}
+                        className={cn(
+                          "px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border",
+                          paymentMethodFilter === f.key 
+                            ? "bg-[#4CAF50] text-white border-[#4CAF50] shadow-md shadow-green-900/20"
+                            : "bg-white text-[#556B55] border-[#E0E8E0] hover:bg-[#F0F5F0]"
+                        )}
+                      >
+                        <span>{f.label}</span>
+                        <span className={cn(
+                          "px-1.5 py-0.2 rounded-full text-[10px] font-black",
+                          paymentMethodFilter === f.key ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
+                        )}>{f.count}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setEditingItem({
+                          date: new Date().toISOString().split('T')[0],
+                          method: 'Mobile Banking',
+                          amount: '',
+                          loanId: '',
+                          userName: ''
+                        });
+                        setIsAdding(true);
+                      }}
+                      className="px-4 py-2 bg-[#4CAF50] text-white rounded-xl text-xs font-bold hover:bg-[#43A047] transition-all flex items-center gap-1.5 shadow-md shadow-green-900/20"
+                    >
+                      <Plus size={16} />
+                      {isBn ? 'নতুন কিস্তি এন্ট্রি' : 'New Installment Entry'}
+                    </button>
+                  )}
                 </div>
+
+                {/* Installments List */}
+                <div className="space-y-3">
+                  {filterData(loanPayments)
+                    .filter(pay => {
+                      if (paymentMethodFilter === 'all') return true;
+                      return (pay.method || '').toLowerCase().includes(paymentMethodFilter.toLowerCase());
+                    })
+                    .map(pay => (
+                      <div key={pay.id} className="p-5 bg-white rounded-2xl border border-[#E0E8E0] hover:border-[#4CAF50] transition-all shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 border-l-4 border-l-[#4CAF50]">
+                        <div className="space-y-2 flex-1">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-green-100 text-green-700 flex items-center justify-center font-black">
+                              <HistoryIcon size={20} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-base text-[#1B301B]">{pay.userName || pay.name || 'Farmer Borrower'}</h4>
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  {pay.installmentNo || 'কিস্তি জমা'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-[#8BA88B] font-mono mt-0.5">
+                                Loan ID: <span className="font-bold text-[#1B301B]">{pay.loanId || 'N/A'}</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-[#556B55] bg-[#F9FBF9] p-3 rounded-xl border border-[#E0E8E0]">
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'পরিশোধিত অর্থ:' : 'Paid Amount:'}</span>
+                              <strong className="text-base text-[#4CAF50]">৳{(parseFloat(pay.amount) || 0).toLocaleString()}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'পেমেন্ট মাধ্যম:' : 'Method:'}</span>
+                              <span className="font-bold text-[#1B301B]">{pay.method || 'Cash'}</span>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'তারিখ:' : 'Payment Date:'}</span>
+                              <span className="font-semibold text-[#1B301B]">{pay.date || 'N/A'}</span>
+                            </div>
+                            <div>
+                              <span className="text-[#8BA88B] block">{isBn ? 'ট্রানজেকশন/রিসিট:' : 'TrxID / Slip:'}</span>
+                              <span className="font-mono text-emerald-800 font-bold">{pay.transactionId || 'CASH-REC'}</span>
+                            </div>
+                            {pay.collectorName && (
+                              <div className="sm:col-span-2 text-xs">
+                                <span className="text-[#8BA88B]">{isBn ? 'গ্রহীতা / ভেরিফাইড:' : 'Verified By:'}</span> <strong className="text-[#1B301B]">{pay.collectorName}</strong>
+                              </div>
+                            )}
+                            {pay.note && (
+                              <div className="sm:col-span-2 text-xs">
+                                <span className="text-[#8BA88B]">{isBn ? 'মন্তব্য:' : 'Note:'}</span> <span className="text-[#1B301B]">{pay.note}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-2 shrink-0 justify-end">
+                          <button
+                            onClick={() => setSelectedPaymentReceipt(pay)}
+                            className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all flex items-center gap-1"
+                            title={isBn ? "মানি রিসিট দেখুন" : "View Money Receipt"}
+                          >
+                            <Info size={14} />
+                            {isBn ? 'রিসিট' : 'Receipt'}
+                          </button>
+
+                          {isAdmin && (
+                            <>
+                              <button 
+                                onClick={() => setEditingItem(pay)} 
+                                className="p-1.5 text-[#4CAF50] hover:bg-[#E8F5E9] rounded-lg transition-colors"
+                                title="Edit Payment"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button 
+                                onClick={() => handleDelete(pay.id)} 
+                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                title="Delete Record"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                  {filterData(loanPayments).filter(p => paymentMethodFilter === 'all' || (p.method || '').toLowerCase().includes(paymentMethodFilter.toLowerCase())).length === 0 && (
+                    <div className="p-12 text-center text-[#556B55] bg-white rounded-2xl border border-dashed border-[#E0E8E0]">
+                      <HistoryIcon size={36} className="mx-auto text-[#8BA88B] mb-2 opacity-50" />
+                      <p className="font-bold">{isBn ? 'এই ফিল্টারে কোনো কিস্তি জমার তথ্য পাওয়া যায়নি' : 'No installment payment records found'}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Printable Money Receipt Modal */}
+                {selectedPaymentReceipt && (
+                  <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl border border-[#E0E8E0]"
+                    >
+                      <div className="flex items-center justify-between pb-4 border-b border-[#E0E8E0]">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-black">
+                            <CheckCircle2 size={18} />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-black text-[#1B301B]">
+                              {isBn ? 'কৃষি বন্ধু মানি রিসিট' : 'Krishi Bondhu Payment Slip'}
+                            </h3>
+                            <p className="text-[10px] text-[#8BA88B]">Official Money Receipt Voucher</p>
+                          </div>
+                        </div>
+                        <button onClick={() => setSelectedPaymentReceipt(null)} className="p-1.5 hover:bg-[#F0F5F0] rounded-full transition-colors">
+                          <X size={18} />
+                        </button>
+                      </div>
+
+                      <div className="bg-[#F9FBF9] p-5 rounded-2xl border border-[#E0E8E0] space-y-3 text-xs">
+                        <div className="flex justify-between py-1 border-b border-gray-200">
+                          <span className="text-[#8BA88B]">{isBn ? 'ঋণ আইডি:' : 'Loan ID:'}</span>
+                          <span className="font-mono font-bold text-[#1B301B]">{selectedPaymentReceipt.loanId}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-gray-200">
+                          <span className="text-[#8BA88B]">{isBn ? 'কৃষক / গ্রহীতার নাম:' : 'Borrower Name:'}</span>
+                          <span className="font-bold text-[#1B301B]">{selectedPaymentReceipt.userName || selectedPaymentReceipt.name}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-gray-200">
+                          <span className="text-[#8BA88B]">{isBn ? 'জমা কিস্তির পরিমাণ:' : 'Installment Paid:'}</span>
+                          <span className="text-sm font-black text-[#4CAF50]">৳{(parseFloat(selectedPaymentReceipt.amount) || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-gray-200">
+                          <span className="text-[#8BA88B]">{isBn ? 'কিস্তি নম্বর:' : 'Installment No:'}</span>
+                          <span className="font-bold text-[#1B301B]">{selectedPaymentReceipt.installmentNo || '১ম কিস্তি'}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-gray-200">
+                          <span className="text-[#8BA88B]">{isBn ? 'পরিশোধ মাধ্যম:' : 'Payment Method:'}</span>
+                          <span className="font-bold text-[#1B301B]">{selectedPaymentReceipt.method}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-gray-200">
+                          <span className="text-[#8BA88B]">{isBn ? 'ট্রানজেকশন আইডি:' : 'Transaction ID:'}</span>
+                          <span className="font-mono font-bold text-emerald-800">{selectedPaymentReceipt.transactionId || 'CASH-REC'}</span>
+                        </div>
+                        <div className="flex justify-between py-1">
+                          <span className="text-[#8BA88B]">{isBn ? 'জমার তারিখ:' : 'Payment Date:'}</span>
+                          <span className="font-bold text-[#1B301B]">{selectedPaymentReceipt.date}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between gap-3 pt-2">
+                        <button
+                          onClick={() => window.print()}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all"
+                        >
+                          <FileDown size={14} />
+                          {isBn ? 'প্রিন্ট / রিসিট ডাউনলোড' : 'Print Voucher'}
+                        </button>
+                        <button
+                          onClick={() => setSelectedPaymentReceipt(null)}
+                          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-bold text-xs transition-all"
+                        >
+                          {isBn ? 'বন্ধ করুন' : 'Close'}
+                        </button>
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
               </div>
-            ))}
+            )}
 
             {activeTab === 'protections' && filterData(protections).map(p => (
               <div key={p.id} className="p-6 hover:bg-[#F9FBF9] transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">

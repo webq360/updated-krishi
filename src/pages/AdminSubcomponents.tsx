@@ -459,19 +459,26 @@ export function Form({ type, initialData, onSave, onCancel, speciesList }: any) 
 
       {type === 'loan-payments' && (
         <>
-          <Input label="Loan ID" value={formData.loanId} onChange={(v: string) => setFormData({...formData, loanId: v})} required />
-          <Input label="Amount Paid (TK)" value={formData.amount} onChange={(v: string) => setFormData({...formData, amount: v})} required />
-          <Input label="Date (YYYY-MM-DD)" value={formData.date} onChange={(v: string) => setFormData({...formData, date: v})} required />
+          <Input label="Loan ID (e.g. LN-XXXXXXXX)" value={formData.loanId} onChange={(v: string) => setFormData({...formData, loanId: v})} required />
+          <Input label="Borrower / Farmer Name" value={formData.userName || formData.name} onChange={(v: string) => setFormData({...formData, userName: v, name: v})} required />
+          <Input label="Installment Amount (TK)" value={formData.amount} onChange={(v: string) => setFormData({...formData, amount: v})} required />
+          <Input label="Installment Number (e.g. 1st / ১ম কিস্তি)" value={formData.installmentNo} onChange={(v: string) => setFormData({...formData, installmentNo: v})} />
+          <Input label="Payment Date (YYYY-MM-DD)" value={formData.date || new Date().toISOString().split('T')[0]} onChange={(v: string) => setFormData({...formData, date: v})} required />
           <Select 
-            label="Method" 
+            label="Payment Method" 
             value={formData.method} 
             onChange={(v: string) => setFormData({...formData, method: v})} 
             options={[
-              { label: 'Bank Transfer', value: 'Bank Transfer' },
-              { label: 'Cash Payment', value: 'Cash Payment' },
-              { label: 'Mobile Banking', value: 'Mobile Banking' }
+              { label: 'Mobile Banking (bKash/Nagad/Rocket)', value: 'Mobile Banking' },
+              { label: 'Bank Transfer (ব্যাংক জমা)', value: 'Bank Transfer' },
+              { label: 'Agent Counter (এজেন্ট কাউন্টার)', value: 'Agent Counter' },
+              { label: 'Cash Payment (নগদ গ্রহণ)', value: 'Cash Payment' }
             ]} 
+            required
           />
+          <Input label="Transaction ID / Slip No." value={formData.transactionId} onChange={(v: string) => setFormData({...formData, transactionId: v})} />
+          <Input label="Collector / Verified By" value={formData.collectorName} onChange={(v: string) => setFormData({...formData, collectorName: v})} />
+          <Textarea label="Payment Remarks / Notes" value={formData.note || formData.remarks} onChange={(v: string) => setFormData({...formData, note: v, remarks: v})} className="md:col-span-2" />
         </>
       )}
 
