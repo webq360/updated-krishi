@@ -723,3 +723,4 @@ app.post("/api/ai/chat", async (req, res) => {
     res.status(500).json({ error: error instanceof Error ? error.message : "Internal Server Error" });
   }
 });
+
